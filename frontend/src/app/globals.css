@@ -91,3 +91,27 @@ input:-webkit-autofill:active {
     -webkit-text-fill-color: #fafafa !important;
     transition: background-color 5000s ease-in-out 0s;
 }
+
+/* Custom Thin Scrollbar matching Theme */
+* {
+  scrollbar-width: thin;
+  scrollbar-color: rgba(250, 204, 21, 0.4) transparent;
+}
+
+::-webkit-scrollbar {
+  width: 6px;
+  height: 6px;
+}
+
+::-webkit-scrollbar-track {
+  background: transparent;
+}
+
+::-webkit-scrollbar-thumb {
+  background: rgba(250, 204, 21, 0.3);
+  border-radius: 10px;
+}
+
+::-webkit-scrollbar-thumb:hover {
+  background: rgba(250, 204, 21, 0.6);
+}

@@ -41,6 +41,14 @@ export default function ExamsPage() {
   const [type, setType] = useState('MAINS');
   const [selectedSubjects, setSelectedSubjects] = useState<Record<string, boolean>>({});
   const [subjectMarks, setSubjectMarks] = useState<Record<string, number>>({});
+  
+  const [initialFormState, setInitialFormState] = useState<string>('');
+  const [isDirty, setIsDirty] = useState(false);
+
+  useEffect(() => {
+    const currentState = JSON.stringify({ name, date, type, selectedSubjects, subjectMarks });
+    setIsDirty(currentState !== initialFormState);
+  }, [name, date, type, selectedSubjects, subjectMarks, initialFormState]);
 
   const fetchData = async () => {
     try {
@@ -83,6 +91,7 @@ export default function ExamsPage() {
     });
     setSelectedSubjects(initSelected);
     setSubjectMarks(initMarks);
+    setInitialFormState(JSON.stringify({ name: '', date: '', type: 'MAINS', selectedSubjects: initSelected, subjectMarks: initMarks }));
   };
 
   const handleEditClick = (exam: Exam) => {
@@ -108,6 +117,7 @@ export default function ExamsPage() {
     
     setSelectedSubjects(newSelected);
     setSubjectMarks(newMarks);
+    setInitialFormState(JSON.stringify({ name: exam.name, date: String(exam.date).substring(0, 10), type: exam.type, selectedSubjects: newSelected, subjectMarks: newMarks }));
     setIsModalOpen(true);
   };
 
@@ -170,7 +180,8 @@ export default function ExamsPage() {
               <label className="text-sm font-medium">Exam Type</label>
               <Select value={type} onChange={value => setType(value)} options={[
                 { value: 'MAINS', label: 'JEE Mains' },
-                { value: 'ADVANCED', label: 'JEE Advanced' }
+                { value: 'ADVANCED', label: 'JEE Advanced' },
+                { value: 'OTHER', label: 'Other' }
               ]} />
             </div>
           </div>
@@ -207,9 +218,9 @@ export default function ExamsPage() {
             </div>
           </div>
 
-          <div className="flex justify-end gap-2 pt-4">
-            <Button type="button" variant="ghost" onClick={() => { resetForm(); setIsModalOpen(false); }}>Cancel</Button>
-            <Button type="submit">{editingExamId ? 'Update Exam' : 'Create Exam'}</Button>
+          <div className="flex justify-end gap-3 pt-4 border-t border-border/50">
+            <Button type="button" variant="outline" onClick={() => { resetForm(); setIsModalOpen(false); }}>Cancel</Button>
+            <Button type="submit" disabled={!isDirty}>{editingExamId ? 'Update Exam' : 'Create Exam'}</Button>
           </div>
         </form>
       </Modal>

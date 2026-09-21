@@ -19,7 +19,13 @@ export default function UserManagement() {
   const [newUser, setNewUser] = useState({ name: "", email: "", role: "student" });
   const [editingUser, setEditingUser] = useState<User | null>(null);
   const [isModalOpen, setIsModalOpen] = useState(false);
+  const [initialFormState, setInitialFormState] = useState<string>('');
+  const [isDirty, setIsDirty] = useState(false);
   const { toast } = useToast();
+
+  useEffect(() => {
+    setIsDirty(JSON.stringify(newUser) !== initialFormState);
+  }, [newUser, initialFormState]);
 
   useEffect(() => {
     fetchUsers();
@@ -78,7 +84,9 @@ export default function UserManagement() {
             <h1 className="text-3xl font-bold tracking-tight text-white text-glow">User Management</h1>
             <Button onClick={() => {
               setEditingUser(null);
-              setNewUser({ name: "", email: "", role: "student" });
+              const defaultUser = { name: "", email: "", role: "student" };
+              setNewUser(defaultUser);
+              setInitialFormState(JSON.stringify(defaultUser));
               setIsModalOpen(true);
             }} className="h-10 w-full sm:w-auto">
               <Plus className="mr-2 h-4 w-4" /> Add User
@@ -131,7 +139,9 @@ export default function UserManagement() {
                     <TableCell className="text-right">
                       <Button variant="ghost" size="icon" onClick={() => {
                         setEditingUser(u);
-                        setNewUser({ name: u.name, email: u.email, role: u.role });
+                        const userToEdit = { name: u.name, email: u.email, role: u.role };
+                        setNewUser(userToEdit);
+                        setInitialFormState(JSON.stringify(userToEdit));
                         setIsModalOpen(true);
                       }} className="hover:bg-primary/20 hover:text-primary">
                         <Edit2 className="h-4 w-4" />
@@ -176,7 +186,7 @@ export default function UserManagement() {
                 <p className="text-xs text-muted-foreground">Password defaults to Firstname@123</p>
                 <div className="space-x-3">
                   <Button type="button" variant="ghost" onClick={() => setIsModalOpen(false)}>Cancel</Button>
-                  <Button type="submit" className="h-10 px-6">
+                  <Button type="submit" disabled={!isDirty} className="h-10 px-6">
                     {editingUser ? 'Update' : <><Plus className="mr-2 h-4 w-4" /> Create</>}
                   </Button>
                 </div>

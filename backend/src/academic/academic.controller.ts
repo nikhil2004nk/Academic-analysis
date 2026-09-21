@@ -1,4 +1,4 @@
-import { Controller, Get, Post, Put, Delete, Body, Param, UseGuards, Request } from '@nestjs/common';
+import { Controller, Get, Post, Put, Delete, Body, Param, UseGuards, Request, Query } from '@nestjs/common';
 import { AcademicService } from './academic.service';
 import { CreateExamDto } from './dto/create-exam.dto';
 import { JwtAuthGuard } from '../auth/guards/jwt-auth.guard';
@@ -97,11 +97,16 @@ export class AcademicController {
 
   @Get('dashboard/student/:id')
   @Roles(Role.SUPERADMIN, Role.STUDENT)
-  getDashboardData(@Param('id') studentId: string, @Request() req: any) {
+  getDashboardData(
+    @Param('id') studentId: string, 
+    @Query('startDate') startDate: string,
+    @Query('endDate') endDate: string,
+    @Request() req: any
+  ) {
     // Basic authorization check: Student can only view their own dashboard
     if (req.user.role === Role.STUDENT && req.user.id !== studentId) {
       studentId = req.user.id; // Override if they try to look at another's
     }
-    return this.academicService.getStudentDashboard(studentId);
+    return this.academicService.getStudentDashboard(studentId, startDate, endDate);
   }
 }

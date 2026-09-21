@@ -18,25 +18,59 @@ interface SelectProps {
 
 export function Select({ options, value, onChange, placeholder = "Select an option", className, valueClassName }: SelectProps) {
   const [isOpen, setIsOpen] = useState(false);
+  const [dropUp, setDropUp] = useState(false);
+  const [dropdownStyles, setDropdownStyles] = useState<React.CSSProperties>({});
   const dropdownRef = useRef<HTMLDivElement>(null);
 
   const selectedOption = options.find((opt) => opt.value === value);
 
   useEffect(() => {
     const handleClickOutside = (event: MouseEvent) => {
+      // Check if click is outside the button. For the portal menu, we can check if it's a select option.
       if (dropdownRef.current && !dropdownRef.current.contains(event.target as Node)) {
-        setIsOpen(false);
+        // Only close if the click wasn't on our portal menu
+        const isMenuClick = (event.target as Element).closest('.select-dropdown-portal');
+        if (!isMenuClick) {
+          setIsOpen(false);
+        }
       }
     };
     document.addEventListener('mousedown', handleClickOutside);
     return () => document.removeEventListener('mousedown', handleClickOutside);
   }, []);
 
+  useEffect(() => {
+    const handleScroll = () => {
+      if (isOpen) setIsOpen(false); // Close on scroll to prevent floating menu
+    };
+    window.addEventListener('scroll', handleScroll, true);
+    return () => window.removeEventListener('scroll', handleScroll, true);
+  }, [isOpen]);
+
+  const handleToggle = () => {
+    if (!isOpen && dropdownRef.current) {
+      const rect = dropdownRef.current.getBoundingClientRect();
+      const spaceBelow = window.innerHeight - rect.bottom;
+      const spaceAbove = rect.top;
+      const willDropUp = spaceBelow < 250 && spaceAbove > spaceBelow;
+      
+      setDropUp(willDropUp);
+      setDropdownStyles({
+        position: 'fixed',
+        width: rect.width,
+        left: rect.left,
+        top: willDropUp ? undefined : rect.bottom + 4,
+        bottom: willDropUp ? window.innerHeight - rect.top + 4 : undefined,
+      });
+    }
+    setIsOpen(!isOpen);
+  };
+
   return (
     <div className={cn("relative w-full", className)} ref={dropdownRef}>
       <button
         type="button"
-        onClick={() => setIsOpen(!isOpen)}
+        onClick={handleToggle}
         className={cn(
           "flex h-11 w-full items-center justify-between rounded-lg border border-border/50 bg-input/50 px-3 py-2 text-sm text-foreground transition-all duration-300 hover:border-primary/50 focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-primary",
           isOpen && "border-primary ring-1 ring-primary shadow-[0_0_10px_rgba(250,204,21,0.2)]"
@@ -45,11 +79,17 @@ export function Select({ options, value, onChange, placeholder = "Select an opti
         <span className={cn(selectedOption ? "text-foreground" : "text-muted-foreground", valueClassName)}>
           {selectedOption ? selectedOption.label : placeholder}
         </span>
-        <ChevronDown className={cn("h-4 w-4 opacity-50 transition-transform duration-300", isOpen && "rotate-180")} />
+        <ChevronDown className={cn("h-4 w-4 opacity-50 transition-transform duration-300", isOpen && (dropUp ? "rotate-0" : "rotate-180"))} />
       </button>
 
-      {isOpen && (
-        <div className="absolute z-50 mt-1 max-h-60 w-full overflow-auto rounded-lg border border-border/50 bg-card glass py-1 shadow-xl animate-in fade-in-80 zoom-in-95">
+      {isOpen && typeof document !== 'undefined' && require('react-dom').createPortal(
+        <div 
+          className={cn(
+            "select-dropdown-portal z-[9999] max-h-60 overflow-auto rounded-lg border border-border bg-[#121212] py-1 shadow-xl animate-in fade-in-80 zoom-in-95",
+            dropUp ? "origin-bottom" : "origin-top"
+          )}
+          style={dropdownStyles}
+        >
           {options.map((option) => (
             <button
               key={option.value}
@@ -69,7 +109,8 @@ export function Select({ options, value, onChange, placeholder = "Select an opti
               {option.label}
             </button>
           ))}
-        </div>
+        </div>,
+        document.body
       )}
     </div>
   );

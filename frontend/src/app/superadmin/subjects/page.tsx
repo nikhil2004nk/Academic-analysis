@@ -20,7 +20,13 @@ export default function SubjectsPage() {
   const [name, setName] = useState('');
   const [editingId, setEditingId] = useState<string | null>(null);
   const [isModalOpen, setIsModalOpen] = useState(false);
+  const [initialFormState, setInitialFormState] = useState<string>('');
+  const [isDirty, setIsDirty] = useState(false);
   const { toast } = useToast();
+
+  useEffect(() => {
+    setIsDirty(name !== initialFormState);
+  }, [name, initialFormState]);
 
   const fetchSubjects = async () => {
     try {
@@ -61,6 +67,7 @@ export default function SubjectsPage() {
   const handleEdit = (subject: Subject) => {
     setEditingId(subject.id);
     setName(subject.name);
+    setInitialFormState(subject.name);
     setIsModalOpen(true);
   };
 
@@ -88,6 +95,7 @@ export default function SubjectsPage() {
         <Button onClick={() => {
           setEditingId(null);
           setName('');
+          setInitialFormState('');
           setIsModalOpen(true);
         }} className="w-full sm:w-auto">Add Subject</Button>
       </div>
@@ -103,9 +111,9 @@ export default function SubjectsPage() {
               placeholder="e.g. Biology" 
             />
           </div>
-          <div className="flex justify-end gap-2 pt-4">
-            <Button type="button" variant="ghost" onClick={() => setIsModalOpen(false)}>Cancel</Button>
-            <Button type="submit">{editingId ? 'Update' : 'Create'}</Button>
+          <div className="flex justify-end gap-3 pt-4 border-t border-border/50">
+            <Button type="button" variant="outline" onClick={() => setIsModalOpen(false)}>Cancel</Button>
+            <Button type="submit" disabled={!isDirty}>{editingId ? 'Update' : 'Create'}</Button>
           </div>
         </form>
       </Modal>

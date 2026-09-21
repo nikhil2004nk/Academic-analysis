@@ -1,6 +1,6 @@
 import { Injectable, NotFoundException, BadRequestException } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
-import { Repository, ILike } from 'typeorm';
+import { Repository, ILike, Between } from 'typeorm';
 import { Subject } from './entities/subject.entity';
 import { Exam } from './entities/exam.entity';
 import { ExamSubject } from './entities/exam-subject.entity';
@@ -408,9 +408,17 @@ export class AcademicService {
     };
   }
 
-  async getStudentDashboard(studentId: string) {
+  async getStudentDashboard(studentId: string, startDate?: string, endDate?: string) {
+    const whereClause: any = { studentId };
+    
+    if (startDate && endDate) {
+      whereClause.exam = {
+        date: Between(new Date(startDate), new Date(endDate))
+      };
+    }
+
     const results = await this.examResultRepository.find({
-      where: { studentId },
+      where: whereClause,
       relations: {
         exam: {
           examSubjects: true,
@@ -422,6 +430,75 @@ export class AcademicService {
       order: { exam: { date: 'ASC' } },
     });
 
-    return results;
+    const presentExams = results.filter(r => r.status === AttendanceStatus.PRESENT);
+    const typeStats: Record<string, { totalObtained: number, totalMax: number, count: number }> = {};
+    
+    presentExams.forEach(r => {
+      const type = r.exam.type || 'MAINS';
+      if (!typeStats[type]) {
+        typeStats[type] = { totalObtained: 0, totalMax: 0, count: 0 };
+      }
+      typeStats[type].totalObtained += r.totalMarksObtained || 0;
+      typeStats[type].totalMax += r.totalMaxMarks || 0;
+      typeStats[type].count += 1;
+    });
+
+    const typePerformance = Object.entries(typeStats).map(([name, stats]) => {
+      const percentage = stats.totalMax > 0 ? (stats.totalObtained / stats.totalMax) * 100 : 0;
+      return {
+        name,
+        percentage: Number(percentage.toFixed(1)),
+        count: stats.count
+      };
+    }).sort((a, b) => b.percentage - a.percentage);
+
+    let highestExam: any = null;
+    let lowestExam: any = null;
+    let maxPct = -1;
+    let minPct = 101;
+
+    const monthStats: Record<string, { totalObtained: number, totalMax: number, date: Date }> = {};
+
+    presentExams.forEach(r => {
+      const pct = r.percentage || (r.totalMaxMarks > 0 ? (r.totalMarksObtained / r.totalMaxMarks) * 100 : 0);
+      if (pct > maxPct) {
+        maxPct = pct;
+        highestExam = { name: r.exam.name, date: r.exam.date, percentage: Number(pct.toFixed(1)), marks: `${r.totalMarksObtained} / ${r.totalMaxMarks}` };
+      }
+      if (pct < minPct) {
+        minPct = pct;
+        lowestExam = { name: r.exam.name, date: r.exam.date, percentage: Number(pct.toFixed(1)), marks: `${r.totalMarksObtained} / ${r.totalMaxMarks}` };
+      }
+
+      // Track month stats
+      const d = new Date(r.exam.date);
+      const monthKey = `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}`;
+      if (!monthStats[monthKey]) {
+        monthStats[monthKey] = { totalObtained: 0, totalMax: 0, date: d };
+      }
+      monthStats[monthKey].totalObtained += r.totalMarksObtained || 0;
+      monthStats[monthKey].totalMax += r.totalMaxMarks || 0;
+    });
+
+    let bestMonth: any = null;
+    let bestMonthPct = -1;
+
+    Object.values(monthStats).forEach(stats => {
+      if (stats.totalMax > 0) {
+        const pct = (stats.totalObtained / stats.totalMax) * 100;
+        if (pct > bestMonthPct) {
+          bestMonthPct = pct;
+          bestMonth = {
+            date: stats.date,
+            percentage: Number(pct.toFixed(1)),
+            marks: `${stats.totalObtained} / ${stats.totalMax}`
+          };
+        }
+      }
+    });
+
+    const analysis = { highestExam, lowestExam, bestMonth };
+
+    return { results, typePerformance, analysis };
   }
 }
