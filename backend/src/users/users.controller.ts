@@ -20,7 +20,7 @@ export class UsersController {
   }
 
   @Get()
-  @Roles(Role.SUPERADMIN, Role.ADMIN)
+  @Roles(Role.SUPERADMIN)
   findAll() {
     return this.usersService.findAll();
   }
@@ -39,7 +39,7 @@ export class UsersController {
   }
 
   @Get(':id')
-  @Roles(Role.SUPERADMIN, Role.ADMIN)
+  @Roles(Role.SUPERADMIN)
   findOne(@Param('id') id: string) {
     return this.usersService.findOne(id);
   }

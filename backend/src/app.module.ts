@@ -6,6 +6,8 @@ import { AppService } from './app.service';
 import { AuthModule } from './auth/auth.module';
 import { UsersModule } from './users/users.module';
 
+import { AcademicModule } from './academic/academic.module';
+
 @Module({
   imports: [
     ConfigModule.forRoot({
@@ -22,11 +24,13 @@ import { UsersModule } from './users/users.module';
         database: configService.get<string>('DB_DATABASE', 'academics_db'),
         entities: [__dirname + '/**/*.entity{.ts,.js}'],
         synchronize: true, // Auto-sync DB schema. Note: Don't use this in production.
+        autoLoadEntities: true,
       }),
       inject: [ConfigService],
     }),
     AuthModule,
     UsersModule,
+    AcademicModule,
   ],
   controllers: [AppController],
   providers: [AppService],

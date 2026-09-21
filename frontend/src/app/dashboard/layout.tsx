@@ -7,7 +7,7 @@ import { DashboardLayout } from "@/components/layout/DashboardLayout";
 export default function DashboardRootLayout({ children }: { children: React.ReactNode }) {
   return (
     <ProtectedRoute>
-      <RoleRoute allowedRoles={['superadmin', 'admin']}>
+      <RoleRoute allowedRoles={['superadmin', 'student']}>
         <DashboardLayout>
           {children}
         </DashboardLayout>
