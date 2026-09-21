@@ -1,6 +1,6 @@
 import { Injectable, NotFoundException, BadRequestException } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
-import { Repository } from 'typeorm';
+import { Repository, ILike } from 'typeorm';
 import { Subject } from './entities/subject.entity';
 import { Exam } from './entities/exam.entity';
 import { ExamSubject } from './entities/exam-subject.entity';
@@ -235,6 +235,90 @@ export class AcademicService {
 
       await this.examResultRepository.save(result);
     }
+  }
+
+  async importHistoricalMarks(studentId: string, payload: any[]) {
+    const createdSubjects: string[] = [];
+    const createdExams: string[] = [];
+    let recordsAdded = 0;
+
+    for (const row of payload) {
+      const { examName, examDate, examType, attendance, marks } = row;
+      
+      // 1. Find or create exam
+      let exam = await this.examRepository.findOne({
+        where: { name: examName },
+        relations: { examSubjects: { subject: true } }
+      });
+
+      if (!exam) {
+        exam = new Exam();
+        exam.name = examName;
+        exam.date = new Date(examDate);
+        exam.type = examType || 'MAINS';
+        exam.examSubjects = [];
+        exam = await this.examRepository.save(exam);
+        createdExams.push(examName);
+      }
+
+      // 2. Process subjects
+      for (const [subjectName, mark] of Object.entries(marks)) {
+        // Find subject case-insensitive
+        let subject = await this.subjectRepository.findOne({
+          where: { name: ILike(subjectName) }
+        });
+
+        if (!subject) {
+          subject = await this.subjectRepository.save({ name: subjectName });
+          createdSubjects.push(subjectName);
+        }
+
+        // Link subject to exam if not already linked
+        const isLinked = exam.examSubjects?.some(es => es.subjectId === subject.id);
+        if (!isLinked) {
+          const exSub = new ExamSubject();
+          exSub.subjectId = subject.id;
+          exSub.maxMarks = 100; // Default max marks for imported historical exams
+          exSub.examId = exam.id;
+          if (!exam.examSubjects) exam.examSubjects = [];
+          exam.examSubjects.push(exSub);
+          await this.examRepository.save(exam);
+        }
+      }
+
+      // 3. Save Marks (reuse saveMarksByStudent logic format)
+      // We need to construct the payload expected by saveMarksByStudent
+      const marksMap: Record<string, number> = {};
+      
+      // re-fetch exam to get all updated relations safely
+      const updatedExam = await this.examRepository.findOne({
+        where: { id: exam.id },
+        relations: { examSubjects: { subject: true } }
+      });
+
+      for (const [subjectName, markVal] of Object.entries(marks)) {
+        const sub = await this.subjectRepository.findOne({ where: { name: ILike(subjectName) } });
+        if (sub) {
+          marksMap[sub.id] = Number(markVal);
+        }
+      }
+
+      const savePayload = [{
+        examId: updatedExam!.id,
+        status: attendance,
+        marks: marksMap
+      }];
+
+      await this.saveMarksByStudent(studentId, savePayload);
+      recordsAdded++;
+    }
+
+    return {
+      message: 'Import successful',
+      recordsAdded,
+      createdExams: [...new Set(createdExams)],
+      createdSubjects: [...new Set(createdSubjects)]
+    };
   }
 
   async getStudentDashboard(studentId: string) {

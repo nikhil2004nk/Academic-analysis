@@ -8,6 +8,7 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@
 import api from '@/lib/api';
 import { format } from 'date-fns';
 import { useToast } from '@/context/ToastContext';
+import * as XLSX from 'xlsx';
 
 interface Exam {
   id: string;
@@ -178,6 +179,104 @@ export default function MarksEntryPage() {
     }
   };
 
+  const handleFileUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+
+    const reader = new FileReader();
+    reader.onload = async (evt) => {
+      try {
+        const bstr = evt.target?.result;
+        const wb = XLSX.read(bstr, { type: 'binary' });
+        const wsname = wb.SheetNames[0];
+        const ws = wb.Sheets[wsname];
+        const data = XLSX.utils.sheet_to_json(ws);
+        
+        // Transform parsed data to expected payload
+        // Expected columns: Exam Name, Date, Exam Type, Attendance, Subject1, Subject2...
+        const payload = data.map((row: any) => {
+          const marks: Record<string, number> = {};
+          const reservedCols = ['Exam Name', 'Date', 'Exam Type', 'Attendance'];
+          for (const key of Object.keys(row)) {
+            if (!reservedCols.includes(key)) {
+              marks[key] = Number(row[key]);
+            }
+          }
+          
+          let eType = row['Exam Type']?.toUpperCase() || 'MAINS';
+          if (eType !== 'MAINS' && eType !== 'ADVANCED') {
+            eType = 'OTHER';
+          }
+
+          let eStatus = row['Attendance']?.toUpperCase() || 'PRESENT';
+          if (eStatus !== 'PRESENT' && eStatus !== 'ABSENT') {
+            eStatus = 'PRESENT';
+          }
+          
+          return {
+            examName: row['Exam Name'],
+            examDate: row['Date'],
+            examType: eType,
+            attendance: eStatus,
+            marks
+          };
+        });
+
+        // send to backend
+        const res = await api.post(`/academic/students/${selectedStudentId}/marks/import`, payload);
+        const report = res.data;
+        
+        let msg = `Successfully imported ${report.recordsAdded} records.`;
+        if (report.createdExams?.length > 0) msg += ` Created exams: ${report.createdExams.join(', ')}.`;
+        if (report.createdSubjects?.length > 0) msg += ` Created subjects: ${report.createdSubjects.join(', ')}.`;
+        
+        toast(msg, 'success');
+        
+        // Refresh data
+        const [examsRes, usersRes] = await Promise.all([
+          api.get('/academic/exams'),
+          api.get('/users')
+        ]);
+        setExams(examsRes.data);
+        fetchExistingMarksByStudent(selectedStudentId);
+        
+      } catch (error) {
+        console.error('Error importing file', error);
+        toast('Failed to import marks. Check file format.', 'error');
+      }
+    };
+    reader.readAsBinaryString(file);
+    e.target.value = ''; // Reset input
+  };
+
+  const handleDownloadTemplate = () => {
+    const templateData = [
+      {
+        'Exam Name': 'JEE Mains Mock 1',
+        'Date': '2024-05-15',
+        'Exam Type': 'MAINS',
+        'Attendance': 'PRESENT',
+        'Physics': 85,
+        'Chemistry': 90,
+        'Mathematics': 88
+      },
+      {
+        'Exam Name': 'Advanced Mock Test 1',
+        'Date': '2024-06-20',
+        'Exam Type': 'ADVANCED',
+        'Attendance': 'ABSENT',
+        'Physics': '',
+        'Chemistry': '',
+        'Mathematics': ''
+      }
+    ];
+    
+    const ws = XLSX.utils.json_to_sheet(templateData);
+    const wb = XLSX.utils.book_new();
+    XLSX.utils.book_append_sheet(wb, ws, "MarksTemplate");
+    XLSX.writeFile(wb, "marks_import_template.xlsx");
+  };
+
   if (loading) return <div className="p-8 text-center text-muted-foreground animate-pulse">Loading...</div>;
 
   return (
@@ -311,7 +410,21 @@ export default function MarksEntryPage() {
             <Card>
               <CardHeader className="flex flex-row items-center justify-between">
                 <CardTitle>Enter Marks: {students.find(s => s.id === selectedStudentId)?.name}</CardTitle>
-                <Button onClick={handleSaveMarks}>Save Marks</Button>
+                <div className="flex gap-2">
+                  <Button variant="ghost" className="text-muted-foreground hover:text-white" onClick={handleDownloadTemplate}>
+                    Download Template
+                  </Button>
+                  <div className="relative overflow-hidden inline-block">
+                    <Button variant="outline" className="cursor-pointer">Import Excel</Button>
+                    <input 
+                      type="file" 
+                      accept=".xlsx, .xls, .csv" 
+                      onChange={handleFileUpload}
+                      className="absolute left-0 top-0 opacity-0 cursor-pointer w-full h-full"
+                    />
+                  </div>
+                  <Button onClick={handleSaveMarks}>Save Marks</Button>
+                </div>
               </CardHeader>
               <CardContent>
                 <div className="space-y-8">

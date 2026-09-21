@@ -83,6 +83,12 @@ export class AcademicController {
     return this.academicService.saveMarksByStudent(studentId, marksData);
   }
 
+  @Post('students/:id/marks/import')
+  @Roles(Role.SUPERADMIN)
+  importHistoricalMarks(@Param('id') studentId: string, @Body() payload: any[]) {
+    return this.academicService.importHistoricalMarks(studentId, payload);
+  }
+
   @Get('dashboard/student/:id')
   @Roles(Role.SUPERADMIN, Role.STUDENT)
   getDashboardData(@Param('id') studentId: string, @Request() req: any) {
