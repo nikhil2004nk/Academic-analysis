@@ -152,6 +152,91 @@ export class AcademicService {
     return this.examResultRepository.save(results);
   }
 
+  async getMarksByExam(examId: string) {
+    const results = await this.examResultRepository.find({
+      where: { examId },
+      relations: { subjectMarks: true },
+    });
+    return results.map(r => {
+      const marksMap: Record<string, number> = {};
+      r.subjectMarks.forEach(sm => {
+        marksMap[sm.subjectId] = sm.marksObtained;
+      });
+      return {
+        studentId: r.studentId,
+        status: r.status,
+        marks: marksMap,
+      };
+    });
+  }
+
+  async getMarksByStudent(studentId: string) {
+    const results = await this.examResultRepository.find({
+      where: { studentId },
+      relations: { subjectMarks: true },
+    });
+    return results.map(r => {
+      const marksMap: Record<string, number> = {};
+      r.subjectMarks.forEach(sm => {
+        marksMap[sm.subjectId] = sm.marksObtained;
+      });
+      return {
+        examId: r.examId,
+        status: r.status,
+        marks: marksMap,
+      };
+    });
+  }
+
+  async saveMarksByStudent(studentId: string, marksData: any[]) {
+    for (const data of marksData) {
+      const examId = data.examId;
+      const exam = await this.getExamById(examId);
+
+      let result = await this.examResultRepository.findOne({
+        where: { examId, studentId },
+        relations: { subjectMarks: true },
+      });
+
+      if (!result) {
+        result = new ExamResult();
+        result.examId = examId;
+        result.studentId = studentId;
+      }
+
+      result.status = data.status;
+
+      if (data.status === AttendanceStatus.ABSENT) {
+        result.totalMarksObtained = 0;
+        result.totalMaxMarks = 0;
+        result.percentage = 0;
+        result.subjectMarks = [];
+      } else {
+        let totalObtained = 0;
+        let totalMax = 0;
+        const subjectMarks: SubjectMark[] = [];
+
+        for (const exSub of exam.examSubjects) {
+          const marksObtained = data.marks[exSub.subjectId] || 0;
+          totalObtained += marksObtained;
+          totalMax += exSub.maxMarks;
+
+          const sm = new SubjectMark();
+          sm.subjectId = exSub.subjectId;
+          sm.marksObtained = marksObtained;
+          subjectMarks.push(sm);
+        }
+
+        result.subjectMarks = subjectMarks;
+        result.totalMarksObtained = totalObtained;
+        result.totalMaxMarks = totalMax;
+        result.percentage = totalMax > 0 ? (totalObtained / totalMax) * 100 : 0;
+      }
+
+      await this.examResultRepository.save(result);
+    }
+  }
+
   async getStudentDashboard(studentId: string) {
     const results = await this.examResultRepository.find({
       where: { studentId },

@@ -65,6 +65,24 @@ export class AcademicController {
     return this.academicService.saveMarks(examId, marksData);
   }
 
+  @Get('exams/:id/marks')
+  @Roles(Role.SUPERADMIN)
+  getMarksByExam(@Param('id') examId: string) {
+    return this.academicService.getMarksByExam(examId);
+  }
+
+  @Get('students/:id/marks')
+  @Roles(Role.SUPERADMIN)
+  getMarksByStudent(@Param('id') studentId: string) {
+    return this.academicService.getMarksByStudent(studentId);
+  }
+
+  @Post('students/:id/marks')
+  @Roles(Role.SUPERADMIN)
+  saveMarksByStudent(@Param('id') studentId: string, @Body() marksData: any[]) {
+    return this.academicService.saveMarksByStudent(studentId, marksData);
+  }
+
   @Get('dashboard/student/:id')
   @Roles(Role.SUPERADMIN, Role.STUDENT)
   getDashboardData(@Param('id') studentId: string, @Request() req: any) {
