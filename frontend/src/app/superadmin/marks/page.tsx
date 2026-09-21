@@ -41,6 +41,10 @@ export default function MarksEntryPage() {
   const [marksData, setMarksData] = useState<Record<string, any>>({});
   const [loading, setLoading] = useState(true);
 
+  const [importSummary, setImportSummary] = useState<any[] | null>(null);
+  const [isUploadModalOpen, setIsUploadModalOpen] = useState(false);
+  const [isDragging, setIsDragging] = useState(false);
+
   useEffect(() => {
     const fetchData = async () => {
       try {
@@ -179,27 +183,39 @@ export default function MarksEntryPage() {
     }
   };
 
-  const handleFileUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
-    const file = e.target.files?.[0];
-    if (!file) return;
-
+  const processFile = (file: File) => {
+    setIsUploadModalOpen(false);
     const reader = new FileReader();
     reader.onload = async (evt) => {
       try {
         const bstr = evt.target?.result;
+        // Don't use cellDates: true to avoid Javascript timezone shifting bugs
         const wb = XLSX.read(bstr, { type: 'binary' });
         const wsname = wb.SheetNames[0];
         const ws = wb.Sheets[wsname];
         const data = XLSX.utils.sheet_to_json(ws);
         
         // Transform parsed data to expected payload
-        // Expected columns: Exam Name, Date, Exam Type, Attendance, Subject1, Subject2...
-        const payload = data.map((row: any) => {
+        // Expected columns: Exam Name, Date, Exam Type, Attendance, Total Max Marks, Total Obtained Marks, Subject1, Subject2...
+        const payload: any[] = [];
+        const frontendErrors: any[] = [];
+        let rowIndex = 1;
+
+        data.forEach((row: any) => {
           const marks: Record<string, number> = {};
-          const reservedCols = ['Exam Name', 'Date', 'Exam Type', 'Attendance'];
+          const reservedCols = ['Exam Name', 'Date', 'Exam Type', 'Attendance', 'Total Max Marks', 'Total Obtained Marks'];
+          
+          let calcObtained = 0;
           for (const key of Object.keys(row)) {
             if (!reservedCols.includes(key)) {
-              marks[key] = Number(row[key]);
+              const cellVal = String(row[key]).trim();
+              if (cellVal !== '') {
+                const val = Number(cellVal);
+                if (!isNaN(val)) {
+                  marks[key] = val;
+                  calcObtained += val;
+                }
+              }
             }
           }
           
@@ -212,25 +228,77 @@ export default function MarksEntryPage() {
           if (eStatus !== 'PRESENT' && eStatus !== 'ABSENT') {
             eStatus = 'PRESENT';
           }
+
+          const totalMaxMarks = row['Total Max Marks'] ? Number(row['Total Max Marks']) : null;
+          const totalObtainedMarks = row['Total Obtained Marks'] ? Number(row['Total Obtained Marks']) : null;
           
-          return {
-            examName: row['Exam Name'],
-            examDate: row['Date'],
-            examType: eType,
-            attendance: eStatus,
-            marks
-          };
+          // Robust Date parsing
+          let rawDate = row['Date'];
+          if (typeof rawDate === 'number') {
+            // Excel serial number format (bulletproof against JS timezone shifts)
+            const parsed = XLSX.SSF.parse_date_code(rawDate);
+            rawDate = `${parsed.y}-${String(parsed.m).padStart(2, '0')}-${String(parsed.d).padStart(2, '0')}`;
+          } else if (rawDate instanceof Date) {
+            rawDate = format(rawDate, 'yyyy-MM-dd');
+          } else if (typeof rawDate === 'string') {
+            // If it's a string like DD-MM-YYYY
+            if (rawDate.match(/^\d{2}-\d{2}-\d{4}$/)) {
+              const [dd, mm, yyyy] = rawDate.split('-');
+              rawDate = `${yyyy}-${mm}-${dd}`;
+            }
+          }
+          
+          // Strict Validation
+          if (totalObtainedMarks !== null && Object.keys(marks).length > 0 && totalObtainedMarks !== calcObtained) {
+            frontendErrors.push({
+              index: rowIndex,
+              examName: row['Exam Name'],
+              status: 'FAILED',
+              message: `Validation Error: Sum of subjects (${calcObtained}) does not match Total Obtained Marks (${totalObtainedMarks}).`,
+              createdItems: []
+            });
+          } else if (!rawDate) {
+             frontendErrors.push({
+              index: rowIndex,
+              examName: row['Exam Name'],
+              status: 'FAILED',
+              message: `Validation Error: Date is required.`,
+              createdItems: []
+            });
+          } else {
+            payload.push({
+              originalIndex: rowIndex, // Keep track to merge reports
+              examName: row['Exam Name'],
+              examDate: rawDate,
+              examType: eType,
+              attendance: eStatus,
+              totalMaxMarks,
+              totalObtainedMarks,
+              marks
+            });
+          }
+          rowIndex++;
         });
 
-        // send to backend
-        const res = await api.post(`/academic/students/${selectedStudentId}/marks/import`, payload);
-        const report = res.data;
-        
-        let msg = `Successfully imported ${report.recordsAdded} records.`;
-        if (report.createdExams?.length > 0) msg += ` Created exams: ${report.createdExams.join(', ')}.`;
-        if (report.createdSubjects?.length > 0) msg += ` Created subjects: ${report.createdSubjects.join(', ')}.`;
-        
-        toast(msg, 'success');
+        // send valid rows to backend
+        let backendReports: any[] = [];
+        if (payload.length > 0) {
+          const res = await api.post(`/academic/students/${selectedStudentId}/marks/import`, payload);
+          const report = res.data;
+          
+          // The backend returns rowReports which corresponds to the valid payload array.
+          // Map original indexes back
+          backendReports = report.rowReports.map((br: any, i: number) => ({
+            ...br,
+            index: payload[i].originalIndex
+          }));
+          
+          toast(`Imported ${report.recordsAdded} records successfully.`, 'success');
+        }
+
+        // Combine reports and show modal
+        const combinedReports = [...frontendErrors, ...backendReports].sort((a, b) => a.index - b.index);
+        setImportSummary(combinedReports);
         
         // Refresh data
         const [examsRes, usersRes] = await Promise.all([
@@ -246,7 +314,28 @@ export default function MarksEntryPage() {
       }
     };
     reader.readAsBinaryString(file);
+  };
+
+  const handleFileUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (file) processFile(file);
     e.target.value = ''; // Reset input
+  };
+
+  const onDragOver = (e: React.DragEvent) => {
+    e.preventDefault();
+    setIsDragging(true);
+  };
+
+  const onDragLeave = () => {
+    setIsDragging(false);
+  };
+
+  const onDrop = (e: React.DragEvent) => {
+    e.preventDefault();
+    setIsDragging(false);
+    const file = e.dataTransfer.files?.[0];
+    if (file) processFile(file);
   };
 
   const handleDownloadTemplate = () => {
@@ -256,6 +345,8 @@ export default function MarksEntryPage() {
         'Date': '2024-05-15',
         'Exam Type': 'MAINS',
         'Attendance': 'PRESENT',
+        'Total Max Marks': 300,
+        'Total Obtained Marks': 263,
         'Physics': 85,
         'Chemistry': 90,
         'Mathematics': 88
@@ -265,9 +356,19 @@ export default function MarksEntryPage() {
         'Date': '2024-06-20',
         'Exam Type': 'ADVANCED',
         'Attendance': 'ABSENT',
+        'Total Max Marks': 360,
+        'Total Obtained Marks': 0,
         'Physics': '',
         'Chemistry': '',
         'Mathematics': ''
+      },
+      {
+        'Exam Name': 'Custom Test No Subjects',
+        'Date': '2024-07-10',
+        'Exam Type': 'OTHER',
+        'Attendance': 'PRESENT',
+        'Total Max Marks': 100,
+        'Total Obtained Marks': 75
       }
     ];
     
@@ -314,7 +415,7 @@ export default function MarksEntryPage() {
                   onChange={handleExamChange}
                   options={[
                     { value: '', label: 'Select an exam...' },
-                    ...exams.map(ex => ({ value: ex.id, label: `${ex.name} (${format(new Date(ex.date), 'MMM dd, yyyy')})` }))
+                    ...exams.map(ex => ({ value: ex.id, label: `${ex.name} (${format(new Date(String(ex.date).substring(0, 10).replace(/-/g, '/')), 'MMM dd, yyyy')})` }))
                   ]}
                 />
               </div>
@@ -414,15 +515,7 @@ export default function MarksEntryPage() {
                   <Button variant="ghost" className="text-muted-foreground hover:text-white" onClick={handleDownloadTemplate}>
                     Download Template
                   </Button>
-                  <div className="relative overflow-hidden inline-block">
-                    <Button variant="outline" className="cursor-pointer">Import Excel</Button>
-                    <input 
-                      type="file" 
-                      accept=".xlsx, .xls, .csv" 
-                      onChange={handleFileUpload}
-                      className="absolute left-0 top-0 opacity-0 cursor-pointer w-full h-full"
-                    />
-                  </div>
+                  <Button variant="outline" onClick={() => setIsUploadModalOpen(true)}>Import Excel</Button>
                   <Button onClick={handleSaveMarks}>Save Marks</Button>
                 </div>
               </CardHeader>
@@ -472,6 +565,93 @@ export default function MarksEntryPage() {
             </Card>
           )}
         </>
+      )}
+      
+      {importSummary && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/80 backdrop-blur-sm">
+          <div className="bg-card w-full max-w-4xl rounded-xl border border-border shadow-2xl flex flex-col max-h-[85vh]">
+            <div className="flex justify-between items-center p-6 border-b border-border/50">
+              <div>
+                <h3 className="text-xl font-bold text-white">Import Summary</h3>
+                <p className="text-sm text-muted-foreground mt-1">
+                  {importSummary.filter(r => r.status === 'SUCCESS').length} Successful, {importSummary.filter(r => r.status === 'FAILED').length} Failed
+                </p>
+              </div>
+              <Button variant="ghost" onClick={() => setImportSummary(null)}>Close</Button>
+            </div>
+            
+            <div className="p-0 overflow-y-auto flex-1">
+              <Table>
+                <TableHeader className="bg-black/40">
+                  <TableRow>
+                    <TableHead className="w-16">Row</TableHead>
+                    <TableHead>Exam Name</TableHead>
+                    <TableHead>Status</TableHead>
+                    <TableHead>Message / Details</TableHead>
+                  </TableRow>
+                </TableHeader>
+                <TableBody>
+                  {importSummary.map((row, idx) => (
+                    <TableRow key={idx} className={row.status === 'SUCCESS' ? 'bg-green-500/5 hover:bg-green-500/10' : 'bg-red-500/5 hover:bg-red-500/10'}>
+                      <TableCell className="font-mono text-muted-foreground text-xs">{row.index}</TableCell>
+                      <TableCell className="font-medium">{row.examName || 'Unnamed'}</TableCell>
+                      <TableCell>
+                        <span className={`text-[10px] font-bold px-2 py-1 rounded uppercase tracking-wider ${row.status === 'SUCCESS' ? 'text-green-400 bg-green-500/20' : 'text-red-400 bg-red-500/20'}`}>
+                          {row.status}
+                        </span>
+                      </TableCell>
+                      <TableCell>
+                        <p className="text-sm">{row.message}</p>
+                        {row.createdItems && row.createdItems.length > 0 && (
+                          <p className="text-xs text-muted-foreground mt-1">
+                            <span className="font-semibold text-white/70">Auto-created:</span> {row.createdItems.join(', ')}
+                          </p>
+                        )}
+                      </TableCell>
+                    </TableRow>
+                  ))}
+                </TableBody>
+              </Table>
+            </div>
+            
+            <div className="p-6 border-t border-border/50 bg-black/20 flex justify-end rounded-b-xl">
+              <Button onClick={() => setImportSummary(null)}>Done</Button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {isUploadModalOpen && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/80 backdrop-blur-sm">
+          <div className="bg-card w-full max-w-lg rounded-xl border border-border shadow-2xl flex flex-col">
+            <div className="flex justify-between items-center p-6 border-b border-border/50">
+              <h3 className="text-xl font-bold text-white">Upload Historical Marks</h3>
+              <Button variant="ghost" onClick={() => setIsUploadModalOpen(false)}>Close</Button>
+            </div>
+            
+            <div className="p-8 flex flex-col items-center justify-center">
+              <div 
+                className={`w-full border-2 border-dashed rounded-xl p-12 flex flex-col items-center justify-center transition-colors cursor-pointer relative ${isDragging ? 'border-primary bg-primary/10' : 'border-muted-foreground/30 hover:border-primary/50 bg-black/20'}`}
+                onDragOver={onDragOver}
+                onDragLeave={onDragLeave}
+                onDrop={onDrop}
+              >
+                <input 
+                  type="file" 
+                  accept=".xlsx, .xls, .csv" 
+                  onChange={handleFileUpload}
+                  className="absolute inset-0 w-full h-full opacity-0 cursor-pointer"
+                />
+                <svg className="w-12 h-12 text-muted-foreground mb-4" fill="none" stroke="currentColor" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M7 16a4 4 0 01-.88-7.903A5 5 0 1115.9 6L16 6a5 5 0 011 9.9M15 13l-3-3m0 0l-3 3m3-3v12"></path>
+                </svg>
+                <p className="text-lg font-medium text-white mb-1">Drag and drop your file here</p>
+                <p className="text-sm text-muted-foreground text-center">or click to browse from your computer</p>
+                <p className="text-xs text-muted-foreground mt-4">Supports .xlsx, .xls, .csv</p>
+              </div>
+            </div>
+          </div>
+        </div>
       )}
     </div>
   );

@@ -173,7 +173,7 @@ export default function ExamsPage() {
               ) : (
                 exams.map((exam) => (
                   <TableRow key={exam.id}>
-                    <TableCell className="font-medium">{format(new Date(exam.date), 'MMM dd, yyyy')}</TableCell>
+                    <TableCell className="font-medium">{format(new Date(String(exam.date).substring(0, 10).replace(/-/g, '/')), 'MMM dd, yyyy')}</TableCell>
                     <TableCell>{exam.name}</TableCell>
                     <TableCell>
                       <span className={`px-2 py-1 rounded-full text-xs font-medium ${exam.type === 'MAINS' ? 'bg-blue-500/20 text-blue-300' : 'bg-purple-500/20 text-purple-300'}`}>

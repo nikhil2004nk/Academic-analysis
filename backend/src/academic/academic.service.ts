@@ -228,6 +228,15 @@ export class AcademicService {
         }
 
         result.subjectMarks = subjectMarks;
+        
+        // Override with explicit totals if provided (for import without subjects)
+        if (data.totalMaxMarks !== undefined && data.totalMaxMarks !== null) {
+          totalMax = data.totalMaxMarks;
+        }
+        if (data.totalObtainedMarks !== undefined && data.totalObtainedMarks !== null) {
+          totalObtained = data.totalObtainedMarks;
+        }
+
         result.totalMarksObtained = totalObtained;
         result.totalMaxMarks = totalMax;
         result.percentage = totalMax > 0 ? (totalObtained / totalMax) * 100 : 0;
@@ -240,14 +249,25 @@ export class AcademicService {
   async importHistoricalMarks(studentId: string, payload: any[]) {
     const createdSubjects: string[] = [];
     const createdExams: string[] = [];
+    const rowReports: any[] = [];
     let recordsAdded = 0;
 
-    for (const row of payload) {
-      const { examName, examDate, examType, attendance, marks } = row;
+    for (let i = 0; i < payload.length; i++) {
+      const row = payload[i];
+      const { examName, examDate, examType, attendance, marks, totalMaxMarks, totalObtainedMarks } = row;
+      const rowReport = {
+        index: i + 1,
+        examName,
+        status: 'SUCCESS',
+        message: 'Imported successfully.',
+        createdItems: [] as string[]
+      };
+
+      try {
       
       // 1. Find or create exam
       let exam = await this.examRepository.findOne({
-        where: { name: examName },
+        where: { name: examName, date: new Date(examDate) },
         relations: { examSubjects: { subject: true } }
       });
 
@@ -259,6 +279,7 @@ export class AcademicService {
         exam.examSubjects = [];
         exam = await this.examRepository.save(exam);
         createdExams.push(examName);
+        rowReport.createdItems.push(`Exam: ${examName}`);
       }
 
       // 2. Process subjects
@@ -271,6 +292,7 @@ export class AcademicService {
         if (!subject) {
           subject = await this.subjectRepository.save({ name: subjectName });
           createdSubjects.push(subjectName);
+          rowReport.createdItems.push(`Subject: ${subjectName}`);
         }
 
         // Link subject to exam if not already linked
@@ -306,18 +328,28 @@ export class AcademicService {
       const savePayload = [{
         examId: updatedExam!.id,
         status: attendance,
-        marks: marksMap
+        marks: marksMap,
+        totalMaxMarks: totalMaxMarks ? Number(totalMaxMarks) : null,
+        totalObtainedMarks: totalObtainedMarks ? Number(totalObtainedMarks) : null,
       }];
 
+      // Need to modify saveMarksByStudent to accept these
       await this.saveMarksByStudent(studentId, savePayload);
       recordsAdded++;
+      } catch (err: any) {
+        rowReport.status = 'FAILED';
+        rowReport.message = err.message || 'Unknown error occurred.';
+      }
+
+      rowReports.push(rowReport);
     }
 
     return {
-      message: 'Import successful',
+      message: 'Import processed',
       recordsAdded,
       createdExams: [...new Set(createdExams)],
-      createdSubjects: [...new Set(createdSubjects)]
+      createdSubjects: [...new Set(createdSubjects)],
+      rowReports
     };
   }
 
