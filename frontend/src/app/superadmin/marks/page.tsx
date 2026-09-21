@@ -172,39 +172,65 @@ export default function MarksEntryPage() {
       if (mode === 'by_exam' && selectedExamId) {
         const marksPayload = Object.keys(marksData).map(studentId => {
           const cleanedMarks: Record<string, number> = {};
+          let calcObtained = 0;
+          let calcMax = 0;
+          
           if (marksData[studentId].marks) {
             for (const [subj, val] of Object.entries(marksData[studentId].marks)) {
-              cleanedMarks[subj] = val === '' ? 0 : Number(val);
+              const numVal = val === '' ? 0 : Number(val);
+              cleanedMarks[subj] = numVal;
+              calcObtained += numVal;
+              
+              const exam = exams.find(e => e.id === selectedExamId);
+              if (exam) {
+                const exSub = exam.examSubjects.find(es => es.subject.id === subj);
+                if (exSub) calcMax += exSub.maxMarks;
+              }
             }
           }
+          
           return {
             studentId,
             status: marksData[studentId].status,
             marks: cleanedMarks,
-            totalMaxMarks: marksData[studentId].totalMaxMarks,
-            totalObtainedMarks: marksData[studentId].totalObtainedMarks
+            totalMaxMarks: marksData[studentId].totalMaxMarks ?? calcMax,
+            totalObtainedMarks: marksData[studentId].totalObtainedMarks ?? calcObtained
           };
         });
         const res = await api.post(`/academic/exams/${selectedExamId}/marks`, marksPayload);
         toast(`Saved marks for ${res.data.length} students`, 'success');
+        fetchExistingMarksByExam(selectedExamId);
       } else if (mode === 'by_student' && selectedStudentId) {
         const marksPayload = Object.keys(marksData).map(examId => {
           const cleanedMarks: Record<string, number> = {};
+          let calcObtained = 0;
+          let calcMax = 0;
+          
           if (marksData[examId].marks) {
             for (const [subj, val] of Object.entries(marksData[examId].marks)) {
-              cleanedMarks[subj] = val === '' ? 0 : Number(val);
+              const numVal = val === '' ? 0 : Number(val);
+              cleanedMarks[subj] = numVal;
+              calcObtained += numVal;
+              
+              const exam = exams.find(e => e.id === examId);
+              if (exam) {
+                const exSub = exam.examSubjects.find(es => es.subject.id === subj);
+                if (exSub) calcMax += exSub.maxMarks;
+              }
             }
           }
+          
           return {
             examId,
             status: marksData[examId].status,
             marks: cleanedMarks,
-            totalMaxMarks: marksData[examId].totalMaxMarks,
-            totalObtainedMarks: marksData[examId].totalObtainedMarks
+            totalMaxMarks: marksData[examId].totalMaxMarks ?? calcMax,
+            totalObtainedMarks: marksData[examId].totalObtainedMarks ?? calcObtained
           };
         });
         const res = await api.post(`/academic/students/${selectedStudentId}/marks`, marksPayload);
         toast(`Saved marks for ${res.data.length} exams`, 'success');
+        fetchExistingMarksByStudent(selectedStudentId);
       }
     } catch (error) {
       console.error('Failed to save marks:', error);
@@ -464,11 +490,18 @@ export default function MarksEntryPage() {
                       <TableRow>
                         <TableHead>Student</TableHead>
                         <TableHead>Attendance</TableHead>
-                        {exams.find(e => e.id === selectedExamId)?.examSubjects.map(sub => (
-                          <TableHead key={sub.subject.id} className="text-right">
-                            {sub.subject.name} (/{sub.maxMarks})
-                          </TableHead>
-                        ))}
+                        {exams.find(e => e.id === selectedExamId)?.examSubjects.length === 0 ? (
+                          <TableHead colSpan={2} className="text-right">Total Marks</TableHead>
+                        ) : (
+                          <>
+                            {exams.find(e => e.id === selectedExamId)?.examSubjects.map(sub => (
+                              <TableHead key={sub.subject.id} className="text-right">
+                                {sub.subject.name} (/{sub.maxMarks})
+                              </TableHead>
+                            ))}
+                            <TableHead className="text-right text-yellow-500">Calculated Total</TableHead>
+                          </>
+                        )}
                       </TableRow>
                     </TableHeader>
                     <TableBody>
@@ -477,7 +510,7 @@ export default function MarksEntryPage() {
                         if (!sData) return null;
                         const exam = exams.find(e => e.id === selectedExamId);
                         return (
-                          <TableRow key={student.id}>
+                          <TableRow key={student.id} className={sData.status === 'ABSENT' ? 'bg-red-500/10 hover:bg-red-500/20 transition-colors' : 'bg-green-500/5 hover:bg-green-500/10 transition-colors'}>
                             <TableCell className="font-medium">
                               {student.name}
                               <div className="text-xs text-muted-foreground font-normal">{student.email}</div>
@@ -486,6 +519,7 @@ export default function MarksEntryPage() {
                               <Select
                                 value={sData.status}
                                 onChange={(value) => handleStatusChange(student.id, value)}
+                                valueClassName={sData.status === 'PRESENT' ? 'text-green-500 font-bold' : 'text-red-500 font-bold'}
                                 options={[
                                   { value: 'PRESENT', label: 'Present' },
                                   { value: 'ABSENT', label: 'Absent' }
@@ -493,43 +527,59 @@ export default function MarksEntryPage() {
                               />
                             </TableCell>
                             {exam?.examSubjects.length === 0 ? (
-                              <TableCell colSpan={2} className="text-right flex gap-4 justify-end">
-                                <div className="flex items-center gap-2">
-                                  <label className="text-xs text-muted-foreground whitespace-nowrap">Obtained</label>
-                                  <input
-                                    type="number"
-                                    disabled={sData.status === 'ABSENT'}
-                                    value={sData.totalObtainedMarks === undefined || sData.totalObtainedMarks === null ? '' : sData.totalObtainedMarks}
-                                    onChange={(e) => handleTotalChange(student.id, 'totalObtainedMarks', e.target.value)}
-                                    className="w-20 border-2 border-yellow-500/50 hover:border-yellow-400 focus:border-yellow-400 bg-black/50 text-white font-bold rounded-md p-2 transition-colors outline-none disabled:opacity-50"
-                                    placeholder="0"
-                                  />
-                                </div>
-                                <div className="flex items-center gap-2">
-                                  <label className="text-xs text-muted-foreground whitespace-nowrap">Max</label>
-                                  <input
-                                    type="number"
-                                    disabled={sData.status === 'ABSENT'}
-                                    value={sData.totalMaxMarks === undefined || sData.totalMaxMarks === null ? '' : sData.totalMaxMarks}
-                                    onChange={(e) => handleTotalChange(student.id, 'totalMaxMarks', e.target.value)}
-                                    className="w-20 border-2 border-yellow-500/50 hover:border-yellow-400 focus:border-yellow-400 bg-black/50 text-white font-bold rounded-md p-2 transition-colors outline-none disabled:opacity-50"
-                                    placeholder="0"
-                                  />
-                                </div>
+                              <TableCell colSpan={2} className="text-right">
+                                {sData.status === 'PRESENT' ? (
+                                  <div className="flex gap-4 justify-end">
+                                    <div className="flex items-center gap-2">
+                                      <label className="text-xs text-muted-foreground whitespace-nowrap">Obtained</label>
+                                      <input
+                                        type="number"
+                                        value={sData.totalObtainedMarks === undefined || sData.totalObtainedMarks === null ? '' : sData.totalObtainedMarks}
+                                        onChange={(e) => handleTotalChange(student.id, 'totalObtainedMarks', e.target.value)}
+                                        className="w-20 border-2 border-yellow-500/50 hover:border-yellow-400 focus:border-yellow-400 bg-black/50 text-white font-bold rounded-md p-2 transition-colors outline-none"
+                                        placeholder="0"
+                                      />
+                                    </div>
+                                    <div className="flex items-center gap-2">
+                                      <label className="text-xs text-muted-foreground whitespace-nowrap">Max</label>
+                                      <input
+                                        type="number"
+                                        value={sData.totalMaxMarks === undefined || sData.totalMaxMarks === null ? '' : sData.totalMaxMarks}
+                                        onChange={(e) => handleTotalChange(student.id, 'totalMaxMarks', e.target.value)}
+                                        className="w-20 border-2 border-yellow-500/50 hover:border-yellow-400 focus:border-yellow-400 bg-black/50 text-white font-bold rounded-md p-2 transition-colors outline-none"
+                                        placeholder="0"
+                                      />
+                                    </div>
+                                  </div>
+                                ) : (
+                                  <span className="text-muted-foreground italic text-sm pr-4">N/A</span>
+                                )}
                               </TableCell>
                             ) : (
-                              exam?.examSubjects.map(sub => (
-                                <TableCell key={sub.subject.id} className="text-right">
-                                  <input
-                                    type="number"
-                                    disabled={sData.status === 'ABSENT'}
-                                    value={sData.marks[sub.subject.id] === undefined ? '' : sData.marks[sub.subject.id]}
-                                    onChange={(e) => handleMarkChange(student.id, sub.subject.id, e.target.value)}
-                                    className="w-24 ml-auto text-right border-2 border-yellow-500/50 hover:border-yellow-400 focus:border-yellow-400 bg-black/50 text-white font-bold rounded-md p-2 transition-colors outline-none disabled:opacity-50"
-                                    placeholder="0"
-                                  />
+                              <>
+                                {exam?.examSubjects.map(sub => (
+                                  <TableCell key={sub.subject.id} className="text-right">
+                                    {sData.status === 'PRESENT' ? (
+                                      <input
+                                        type="number"
+                                        value={sData.marks[sub.subject.id] === undefined ? '' : sData.marks[sub.subject.id]}
+                                        onChange={(e) => handleMarkChange(student.id, sub.subject.id, e.target.value)}
+                                        className="w-24 ml-auto text-right border-2 border-yellow-500/50 hover:border-yellow-400 focus:border-yellow-400 bg-black/50 text-white font-bold rounded-md p-2 transition-colors outline-none"
+                                        placeholder="0"
+                                      />
+                                    ) : (
+                                      <span className="text-muted-foreground">-</span>
+                                    )}
+                                  </TableCell>
+                                ))}
+                                <TableCell className="text-right font-bold text-yellow-500">
+                                  {sData.status === 'PRESENT' ? (
+                                    `${Object.values(sData.marks).reduce((acc: number, curr: any) => acc + (Number(curr) || 0), 0)} / ${exam?.examSubjects.reduce((acc, curr) => acc + curr.maxMarks, 0) || 0}`
+                                  ) : (
+                                    <span className="text-muted-foreground text-sm font-normal italic">N/A</span>
+                                  )}
                                 </TableCell>
-                              ))
+                              </>
                             )}
                           </TableRow>
                         );
@@ -581,16 +631,17 @@ export default function MarksEntryPage() {
                     const eData = marksData[exam.id];
                     if (!eData) return null;
                     return (
-                      <div key={exam.id} className="border border-border/50 rounded-lg p-4 bg-white/5">
-                        <div className="flex justify-between items-center mb-4">
-                          <div>
-                            <h4 className="font-semibold text-lg">{exam.name}</h4>
-                            <p className="text-xs text-muted-foreground">{format(new Date(exam.date), 'MMMM dd, yyyy')}</p>
+                      <div key={exam.id} className={`border border-border/30 rounded-md p-3 shadow-sm transition-colors ${eData.status === 'ABSENT' ? 'bg-red-500/10' : 'bg-green-500/5'}`}>
+                        <div className="flex justify-between items-center mb-3">
+                          <div className="flex items-center gap-3">
+                            <h4 className="font-semibold text-base">{exam.name}</h4>
+                            <span className="text-xs px-2 py-0.5 rounded bg-white/10 text-muted-foreground">{format(new Date(exam.date), 'MMM dd, yyyy')}</span>
                           </div>
-                          <div className="w-32">
+                          <div className="w-28">
                             <Select
                               value={eData.status}
                               onChange={(value) => handleStatusChange(exam.id, value)}
+                              valueClassName={eData.status === 'PRESENT' ? 'text-green-500 font-bold' : 'text-red-500 font-bold'}
                               options={[
                                 { value: 'PRESENT', label: 'Present' },
                                 { value: 'ABSENT', label: 'Absent' }
@@ -598,48 +649,55 @@ export default function MarksEntryPage() {
                             />
                           </div>
                         </div>
-                        <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
-                          {exam.examSubjects.length === 0 ? (
-                            <>
-                              <div className="space-y-2">
-                                <label className="text-sm font-medium text-muted-foreground">Total Obtained</label>
-                                <input
-                                  type="number"
-                                  disabled={eData.status === 'ABSENT'}
-                                  value={eData.totalObtainedMarks === undefined || eData.totalObtainedMarks === null ? '' : eData.totalObtainedMarks}
-                                  onChange={(e) => handleTotalChange(exam.id, 'totalObtainedMarks', e.target.value)}
-                                  className="w-full text-right border-2 border-yellow-500/50 hover:border-yellow-400 focus:border-yellow-400 bg-black/50 text-white font-bold rounded-md p-2 transition-colors outline-none disabled:opacity-50"
-                                  placeholder="0"
-                                />
-                              </div>
-                              <div className="space-y-2">
-                                <label className="text-sm font-medium text-muted-foreground">Total Max</label>
-                                <input
-                                  type="number"
-                                  disabled={eData.status === 'ABSENT'}
-                                  value={eData.totalMaxMarks === undefined || eData.totalMaxMarks === null ? '' : eData.totalMaxMarks}
-                                  onChange={(e) => handleTotalChange(exam.id, 'totalMaxMarks', e.target.value)}
-                                  className="w-full text-right border-2 border-yellow-500/50 hover:border-yellow-400 focus:border-yellow-400 bg-black/50 text-white font-bold rounded-md p-2 transition-colors outline-none disabled:opacity-50"
-                                  placeholder="0"
-                                />
-                              </div>
-                            </>
-                          ) : (
-                            exam.examSubjects.map(sub => (
-                              <div key={sub.subject.id} className="space-y-2">
-                                <label className="text-sm font-medium text-muted-foreground">{sub.subject.name} (/{sub.maxMarks})</label>
-                                <input
-                                  type="number"
-                                  disabled={eData.status === 'ABSENT'}
-                                  value={eData.marks[sub.subject.id] === undefined ? '' : eData.marks[sub.subject.id]}
-                                  onChange={(e) => handleMarkChange(exam.id, sub.subject.id, e.target.value)}
-                                  className="w-full text-right border-2 border-yellow-500/50 hover:border-yellow-400 focus:border-yellow-400 bg-black/50 text-white font-bold rounded-md p-2 transition-colors outline-none disabled:opacity-50"
-                                  placeholder="0"
-                                />
-                              </div>
-                            ))
-                          )}
-                        </div>
+                        {eData.status === 'PRESENT' && (
+                          <div className="flex flex-wrap items-end gap-4 bg-black/20 p-3 rounded-md">
+                            {exam.examSubjects.length === 0 ? (
+                              <>
+                                <div className="flex flex-col gap-1 w-24">
+                                  <label className="text-xs font-medium text-muted-foreground">Obtained</label>
+                                  <input
+                                    type="number"
+                                    value={eData.totalObtainedMarks === undefined || eData.totalObtainedMarks === null ? '' : eData.totalObtainedMarks}
+                                    onChange={(e) => handleTotalChange(exam.id, 'totalObtainedMarks', e.target.value)}
+                                    className="w-full text-right border border-yellow-500/30 hover:border-yellow-400 focus:border-yellow-400 bg-black/50 text-white font-bold rounded px-2 py-1 h-8 text-sm transition-colors outline-none"
+                                    placeholder="0"
+                                  />
+                                </div>
+                                <div className="flex flex-col gap-1 w-24">
+                                  <label className="text-xs font-medium text-muted-foreground">Max Marks</label>
+                                  <input
+                                    type="number"
+                                    value={eData.totalMaxMarks === undefined || eData.totalMaxMarks === null ? '' : eData.totalMaxMarks}
+                                    onChange={(e) => handleTotalChange(exam.id, 'totalMaxMarks', e.target.value)}
+                                    className="w-full text-right border border-yellow-500/30 hover:border-yellow-400 focus:border-yellow-400 bg-black/50 text-white font-bold rounded px-2 py-1 h-8 text-sm transition-colors outline-none"
+                                    placeholder="0"
+                                  />
+                                </div>
+                              </>
+                            ) : (
+                              <>
+                                {exam.examSubjects.map(sub => (
+                                  <div key={sub.subject.id} className="flex flex-col gap-1 w-28">
+                                    <label className="text-xs font-medium text-muted-foreground leading-tight">{sub.subject.name} <span className="opacity-70">(/{sub.maxMarks})</span></label>
+                                    <input
+                                      type="number"
+                                      value={eData.marks[sub.subject.id] === undefined ? '' : eData.marks[sub.subject.id]}
+                                      onChange={(e) => handleMarkChange(exam.id, sub.subject.id, e.target.value)}
+                                      className="w-full text-right border border-yellow-500/30 hover:border-yellow-400 focus:border-yellow-400 bg-black/50 text-white font-bold rounded px-2 py-1 h-8 text-sm transition-colors outline-none"
+                                      placeholder="0"
+                                    />
+                                  </div>
+                                ))}
+                                <div className="ml-auto flex items-center gap-3 pl-4 border-l border-white/10 h-8">
+                                  <span className="text-xs font-medium text-muted-foreground uppercase tracking-wider">Total</span>
+                                  <span className="font-bold text-yellow-500 text-base">
+                                    {Object.values(eData.marks).reduce((acc: number, curr: any) => acc + (Number(curr) || 0), 0)} / {exam.examSubjects.reduce((acc, curr) => acc + curr.maxMarks, 0)}
+                                  </span>
+                                </div>
+                              </>
+                            )}
+                          </div>
+                        )}
                       </div>
                     );
                   })}

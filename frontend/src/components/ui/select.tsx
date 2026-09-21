@@ -13,9 +13,10 @@ interface SelectProps {
   onChange: (value: string) => void;
   placeholder?: string;
   className?: string;
+  valueClassName?: string;
 }
 
-export function Select({ options, value, onChange, placeholder = "Select an option", className }: SelectProps) {
+export function Select({ options, value, onChange, placeholder = "Select an option", className, valueClassName }: SelectProps) {
   const [isOpen, setIsOpen] = useState(false);
   const dropdownRef = useRef<HTMLDivElement>(null);
 
@@ -41,7 +42,7 @@ export function Select({ options, value, onChange, placeholder = "Select an opti
           isOpen && "border-primary ring-1 ring-primary shadow-[0_0_10px_rgba(250,204,21,0.2)]"
         )}
       >
-        <span className={selectedOption ? "text-foreground" : "text-muted-foreground"}>
+        <span className={cn(selectedOption ? "text-foreground" : "text-muted-foreground", valueClassName)}>
           {selectedOption ? selectedOption.label : placeholder}
         </span>
         <ChevronDown className={cn("h-4 w-4 opacity-50 transition-transform duration-300", isOpen && "rotate-180")} />

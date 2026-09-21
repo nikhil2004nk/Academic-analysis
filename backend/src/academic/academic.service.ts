@@ -241,6 +241,7 @@ export class AcademicService {
   }
 
   async saveMarksByStudent(studentId: string, marksData: any[]) {
+    const savedResults: ExamResult[] = [];
     for (const data of marksData) {
       const examId = data.examId;
       const exam = await this.getExamById(examId);
@@ -294,8 +295,10 @@ export class AcademicService {
         result.percentage = totalMax > 0 ? (totalObtained / totalMax) * 100 : 0;
       }
 
-      await this.examResultRepository.save(result);
+      const saved = await this.examResultRepository.save(result);
+      savedResults.push(saved);
     }
+    return savedResults;
   }
 
   async importHistoricalMarks(studentId: string, payload: any[]) {
