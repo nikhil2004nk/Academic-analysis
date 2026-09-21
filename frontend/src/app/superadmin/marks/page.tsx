@@ -73,7 +73,12 @@ export default function MarksEntryPage() {
       students.forEach(student => {
         const existingMark = existing.find((m: any) => m.studentId === student.id);
         if (existingMark) {
-          initialMarks[student.id] = { status: existingMark.status, marks: existingMark.marks || {} };
+          initialMarks[student.id] = { 
+            status: existingMark.status, 
+            marks: existingMark.marks || {},
+            totalMaxMarks: existingMark.totalMaxMarks,
+            totalObtainedMarks: existingMark.totalObtainedMarks
+          };
         } else {
           initialMarks[student.id] = { status: 'PRESENT', marks: {} };
         }
@@ -94,7 +99,12 @@ export default function MarksEntryPage() {
       exams.forEach(exam => {
         const existingMark = existing.find((m: any) => m.examId === exam.id);
         if (existingMark) {
-          initialMarks[exam.id] = { status: existingMark.status, marks: existingMark.marks || {} };
+          initialMarks[exam.id] = { 
+            status: existingMark.status, 
+            marks: existingMark.marks || {},
+            totalMaxMarks: existingMark.totalMaxMarks,
+            totalObtainedMarks: existingMark.totalObtainedMarks
+          };
         } else {
           initialMarks[exam.id] = { status: 'PRESENT', marks: {} };
         }
@@ -137,6 +147,16 @@ export default function MarksEntryPage() {
     }));
   };
 
+  const handleTotalChange = (entityId: string, field: 'totalMaxMarks' | 'totalObtainedMarks', value: string) => {
+    setMarksData(prev => ({
+      ...prev,
+      [entityId]: {
+        ...prev[entityId],
+        [field]: value === '' ? null : Number(value)
+      }
+    }));
+  };
+
   const handleStatusChange = (entityId: string, status: string) => {
     setMarksData(prev => ({
       ...prev,
@@ -149,34 +169,43 @@ export default function MarksEntryPage() {
 
   const handleSaveMarks = async () => {
     try {
-      const payload = Object.entries(marksData).map(([entityId, data]) => {
-        const cleanedMarks: Record<string, number> = {};
-        for (const [subj, val] of Object.entries(data.marks as Record<string, any>)) {
-          cleanedMarks[subj] = val === '' ? 0 : Number(val);
-        }
-        
-        if (mode === 'by_exam') {
+      if (mode === 'by_exam' && selectedExamId) {
+        const marksPayload = Object.keys(marksData).map(studentId => {
+          const cleanedMarks: Record<string, number> = {};
+          if (marksData[studentId].marks) {
+            for (const [subj, val] of Object.entries(marksData[studentId].marks)) {
+              cleanedMarks[subj] = val === '' ? 0 : Number(val);
+            }
+          }
           return {
-            studentId: entityId,
-            status: data.status,
-            marks: cleanedMarks
+            studentId,
+            status: marksData[studentId].status,
+            marks: cleanedMarks,
+            totalMaxMarks: marksData[studentId].totalMaxMarks,
+            totalObtainedMarks: marksData[studentId].totalObtainedMarks
           };
-        } else {
+        });
+        const res = await api.post(`/academic/exams/${selectedExamId}/marks`, marksPayload);
+        toast(`Saved marks for ${res.data.length} students`, 'success');
+      } else if (mode === 'by_student' && selectedStudentId) {
+        const marksPayload = Object.keys(marksData).map(examId => {
+          const cleanedMarks: Record<string, number> = {};
+          if (marksData[examId].marks) {
+            for (const [subj, val] of Object.entries(marksData[examId].marks)) {
+              cleanedMarks[subj] = val === '' ? 0 : Number(val);
+            }
+          }
           return {
-            examId: entityId,
-            status: data.status,
-            marks: cleanedMarks
+            examId,
+            status: marksData[examId].status,
+            marks: cleanedMarks,
+            totalMaxMarks: marksData[examId].totalMaxMarks,
+            totalObtainedMarks: marksData[examId].totalObtainedMarks
           };
-        }
-      });
-
-      if (mode === 'by_exam') {
-        await api.post(`/academic/exams/${selectedExamId}/marks`, payload);
-      } else {
-        await api.post(`/academic/students/${selectedStudentId}/marks`, payload);
+        });
+        const res = await api.post(`/academic/students/${selectedStudentId}/marks`, marksPayload);
+        toast(`Saved marks for ${res.data.length} exams`, 'success');
       }
-      
-      toast('Marks saved successfully!', 'success');
     } catch (error) {
       console.error('Failed to save marks:', error);
       toast('Failed to save marks', 'error');
@@ -463,18 +492,45 @@ export default function MarksEntryPage() {
                                 ]}
                               />
                             </TableCell>
-                            {exam?.examSubjects.map(sub => (
-                              <TableCell key={sub.subject.id} className="text-right">
-                                <input
-                                  type="number"
-                                  disabled={sData.status === 'ABSENT'}
-                                  value={sData.marks[sub.subject.id] === undefined ? '' : sData.marks[sub.subject.id]}
-                                  onChange={(e) => handleMarkChange(student.id, sub.subject.id, e.target.value)}
-                                  className="w-24 ml-auto text-right border-2 border-yellow-500/50 hover:border-yellow-400 focus:border-yellow-400 bg-black/50 text-white font-bold rounded-md p-2 transition-colors outline-none"
-                                  placeholder="0"
-                                />
+                            {exam?.examSubjects.length === 0 ? (
+                              <TableCell colSpan={2} className="text-right flex gap-4 justify-end">
+                                <div className="flex items-center gap-2">
+                                  <label className="text-xs text-muted-foreground whitespace-nowrap">Obtained</label>
+                                  <input
+                                    type="number"
+                                    disabled={sData.status === 'ABSENT'}
+                                    value={sData.totalObtainedMarks === undefined || sData.totalObtainedMarks === null ? '' : sData.totalObtainedMarks}
+                                    onChange={(e) => handleTotalChange(student.id, 'totalObtainedMarks', e.target.value)}
+                                    className="w-20 border-2 border-yellow-500/50 hover:border-yellow-400 focus:border-yellow-400 bg-black/50 text-white font-bold rounded-md p-2 transition-colors outline-none disabled:opacity-50"
+                                    placeholder="0"
+                                  />
+                                </div>
+                                <div className="flex items-center gap-2">
+                                  <label className="text-xs text-muted-foreground whitespace-nowrap">Max</label>
+                                  <input
+                                    type="number"
+                                    disabled={sData.status === 'ABSENT'}
+                                    value={sData.totalMaxMarks === undefined || sData.totalMaxMarks === null ? '' : sData.totalMaxMarks}
+                                    onChange={(e) => handleTotalChange(student.id, 'totalMaxMarks', e.target.value)}
+                                    className="w-20 border-2 border-yellow-500/50 hover:border-yellow-400 focus:border-yellow-400 bg-black/50 text-white font-bold rounded-md p-2 transition-colors outline-none disabled:opacity-50"
+                                    placeholder="0"
+                                  />
+                                </div>
                               </TableCell>
-                            ))}
+                            ) : (
+                              exam?.examSubjects.map(sub => (
+                                <TableCell key={sub.subject.id} className="text-right">
+                                  <input
+                                    type="number"
+                                    disabled={sData.status === 'ABSENT'}
+                                    value={sData.marks[sub.subject.id] === undefined ? '' : sData.marks[sub.subject.id]}
+                                    onChange={(e) => handleMarkChange(student.id, sub.subject.id, e.target.value)}
+                                    className="w-24 ml-auto text-right border-2 border-yellow-500/50 hover:border-yellow-400 focus:border-yellow-400 bg-black/50 text-white font-bold rounded-md p-2 transition-colors outline-none disabled:opacity-50"
+                                    placeholder="0"
+                                  />
+                                </TableCell>
+                              ))
+                            )}
                           </TableRow>
                         );
                       })}
@@ -543,19 +599,46 @@ export default function MarksEntryPage() {
                           </div>
                         </div>
                         <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
-                          {exam.examSubjects.map(sub => (
-                            <div key={sub.subject.id} className="space-y-2">
-                              <label className="text-sm font-medium text-muted-foreground">{sub.subject.name} (/{sub.maxMarks})</label>
-                              <input
-                                type="number"
-                                disabled={eData.status === 'ABSENT'}
-                                value={eData.marks[sub.subject.id] === undefined ? '' : eData.marks[sub.subject.id]}
-                                onChange={(e) => handleMarkChange(exam.id, sub.subject.id, e.target.value)}
-                                className="w-full text-right border-2 border-yellow-500/50 hover:border-yellow-400 focus:border-yellow-400 bg-black/50 text-white font-bold rounded-md p-2 transition-colors outline-none"
-                                placeholder="0"
-                              />
-                            </div>
-                          ))}
+                          {exam.examSubjects.length === 0 ? (
+                            <>
+                              <div className="space-y-2">
+                                <label className="text-sm font-medium text-muted-foreground">Total Obtained</label>
+                                <input
+                                  type="number"
+                                  disabled={eData.status === 'ABSENT'}
+                                  value={eData.totalObtainedMarks === undefined || eData.totalObtainedMarks === null ? '' : eData.totalObtainedMarks}
+                                  onChange={(e) => handleTotalChange(exam.id, 'totalObtainedMarks', e.target.value)}
+                                  className="w-full text-right border-2 border-yellow-500/50 hover:border-yellow-400 focus:border-yellow-400 bg-black/50 text-white font-bold rounded-md p-2 transition-colors outline-none disabled:opacity-50"
+                                  placeholder="0"
+                                />
+                              </div>
+                              <div className="space-y-2">
+                                <label className="text-sm font-medium text-muted-foreground">Total Max</label>
+                                <input
+                                  type="number"
+                                  disabled={eData.status === 'ABSENT'}
+                                  value={eData.totalMaxMarks === undefined || eData.totalMaxMarks === null ? '' : eData.totalMaxMarks}
+                                  onChange={(e) => handleTotalChange(exam.id, 'totalMaxMarks', e.target.value)}
+                                  className="w-full text-right border-2 border-yellow-500/50 hover:border-yellow-400 focus:border-yellow-400 bg-black/50 text-white font-bold rounded-md p-2 transition-colors outline-none disabled:opacity-50"
+                                  placeholder="0"
+                                />
+                              </div>
+                            </>
+                          ) : (
+                            exam.examSubjects.map(sub => (
+                              <div key={sub.subject.id} className="space-y-2">
+                                <label className="text-sm font-medium text-muted-foreground">{sub.subject.name} (/{sub.maxMarks})</label>
+                                <input
+                                  type="number"
+                                  disabled={eData.status === 'ABSENT'}
+                                  value={eData.marks[sub.subject.id] === undefined ? '' : eData.marks[sub.subject.id]}
+                                  onChange={(e) => handleMarkChange(exam.id, sub.subject.id, e.target.value)}
+                                  className="w-full text-right border-2 border-yellow-500/50 hover:border-yellow-400 focus:border-yellow-400 bg-black/50 text-white font-bold rounded-md p-2 transition-colors outline-none disabled:opacity-50"
+                                  placeholder="0"
+                                />
+                              </div>
+                            ))
+                          )}
                         </div>
                       </div>
                     );

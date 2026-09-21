@@ -1,4 +1,4 @@
-import { Controller, Get, Post, Delete, Body, Param, UseGuards, Request } from '@nestjs/common';
+import { Controller, Get, Post, Put, Delete, Body, Param, UseGuards, Request } from '@nestjs/common';
 import { AcademicService } from './academic.service';
 import { CreateExamDto } from './dto/create-exam.dto';
 import { JwtAuthGuard } from '../auth/guards/jwt-auth.guard';
@@ -57,6 +57,12 @@ export class AcademicController {
   @Roles(Role.SUPERADMIN)
   deleteExam(@Param('id') id: string) {
     return this.academicService.deleteExam(id);
+  }
+
+  @Put('exams/:id')
+  @Roles(Role.SUPERADMIN)
+  updateExam(@Param('id') id: string, @Body() updateExamDto: CreateExamDto) {
+    return this.academicService.updateExam(id, updateExamDto);
   }
 
   @Post('exams/:id/marks')

@@ -67,6 +67,45 @@ export class AcademicService {
     return this.examRepository.save(exam);
   }
 
+  async updateExam(id: string, updateExamDto: CreateExamDto) {
+    const exam = await this.getExamById(id);
+    
+    exam.name = updateExamDto.name;
+    exam.date = new Date(updateExamDto.date);
+    exam.type = updateExamDto.type;
+
+    const newSubjectIds = updateExamDto.subjects.map(s => s.subjectId);
+
+    // Delete removed subjects
+    if (newSubjectIds.length > 0) {
+      await this.examRepository.manager
+        .createQueryBuilder()
+        .delete()
+        .from(ExamSubject)
+        .where('examId = :id AND subjectId NOT IN (:...newSubjectIds)', { id, newSubjectIds })
+        .execute();
+    } else {
+      // If no subjects, delete all
+      await this.examRepository.manager
+        .createQueryBuilder()
+        .delete()
+        .from(ExamSubject)
+        .where('examId = :id', { id })
+        .execute();
+    }
+
+    // Reconstruct exam subjects (TypeORM will update existing and insert new on save)
+    exam.examSubjects = updateExamDto.subjects.map(sub => {
+      const examSubject = new ExamSubject();
+      examSubject.examId = exam.id;
+      examSubject.subjectId = sub.subjectId;
+      examSubject.maxMarks = sub.maxMarks;
+      return examSubject;
+    });
+
+    return this.examRepository.save(exam);
+  }
+
   async findAllExams() {
     return this.examRepository.find({
       relations: {
@@ -140,10 +179,19 @@ export class AcademicService {
           subjectMarks.push(sm);
         }
 
+        result.subjectMarks = subjectMarks;
+
+        // Override with explicit totals if provided
+        if (data.totalMaxMarks !== undefined && data.totalMaxMarks !== null) {
+          totalMax = data.totalMaxMarks;
+        }
+        if (data.totalObtainedMarks !== undefined && data.totalObtainedMarks !== null) {
+          totalObtained = data.totalObtainedMarks;
+        }
+
         result.totalMarksObtained = totalObtained;
         result.totalMaxMarks = totalMax;
         result.percentage = totalMax > 0 ? (totalObtained / totalMax) * 100 : 0;
-        result.subjectMarks = subjectMarks;
       }
 
       results.push(result);
@@ -166,6 +214,8 @@ export class AcademicService {
         studentId: r.studentId,
         status: r.status,
         marks: marksMap,
+        totalMaxMarks: r.totalMaxMarks,
+        totalObtainedMarks: r.totalMarksObtained,
       };
     });
   }
@@ -184,6 +234,8 @@ export class AcademicService {
         examId: r.examId,
         status: r.status,
         marks: marksMap,
+        totalMaxMarks: r.totalMaxMarks,
+        totalObtainedMarks: r.totalMarksObtained,
       };
     });
   }

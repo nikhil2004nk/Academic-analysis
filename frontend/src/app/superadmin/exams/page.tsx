@@ -33,11 +33,13 @@ export default function ExamsPage() {
   const [loading, setLoading] = useState(true);
   const { toast } = useToast();
   const [isModalOpen, setIsModalOpen] = useState(false);
+  const [editingExamId, setEditingExamId] = useState<string | null>(null);
 
   // Form State
   const [name, setName] = useState('');
   const [date, setDate] = useState('');
   const [type, setType] = useState('MAINS');
+  const [selectedSubjects, setSelectedSubjects] = useState<Record<string, boolean>>({});
   const [subjectMarks, setSubjectMarks] = useState<Record<string, number>>({});
 
   const fetchData = async () => {
@@ -48,12 +50,14 @@ export default function ExamsPage() {
       ]);
       setExams(examsRes.data);
       setSubjects(subjectsRes.data);
-      
-      // Init subject marks (default 100)
+      // Init selected subjects and marks
+      const initSelected: Record<string, boolean> = {};
       const initMarks: Record<string, number> = {};
       subjectsRes.data.forEach((sub: Subject) => {
+        initSelected[sub.id] = true; // By default select all for new exams
         initMarks[sub.id] = 100;
       });
+      setSelectedSubjects(initSelected);
       setSubjectMarks(initMarks);
     } catch (error) {
       console.error('Error fetching data:', error);
@@ -66,29 +70,76 @@ export default function ExamsPage() {
     fetchData();
   }, []);
 
-  const handleCreateExam = async (e: React.FormEvent) => {
+  const resetForm = () => {
+    setName('');
+    setDate('');
+    setType('MAINS');
+    setEditingExamId(null);
+    const initSelected: Record<string, boolean> = {};
+    const initMarks: Record<string, number> = {};
+    subjects.forEach((sub: Subject) => {
+      initSelected[sub.id] = true;
+      initMarks[sub.id] = 100;
+    });
+    setSelectedSubjects(initSelected);
+    setSubjectMarks(initMarks);
+  };
+
+  const handleEditClick = (exam: Exam) => {
+    setEditingExamId(exam.id);
+    setName(exam.name);
+    setDate(String(exam.date).substring(0, 10));
+    setType(exam.type);
+    
+    const newSelected: Record<string, boolean> = {};
+    const newMarks: Record<string, number> = {};
+    
+    // First default all to false
+    subjects.forEach(sub => {
+      newSelected[sub.id] = false;
+      newMarks[sub.id] = 100;
+    });
+    
+    // Then set the actual ones
+    exam.examSubjects?.forEach(es => {
+      newSelected[es.subject.id] = true;
+      newMarks[es.subject.id] = es.maxMarks;
+    });
+    
+    setSelectedSubjects(newSelected);
+    setSubjectMarks(newMarks);
+    setIsModalOpen(true);
+  };
+
+  const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     try {
       const payload = {
         name,
         date,
         type,
-        subjects: Object.entries(subjectMarks).map(([subjectId, maxMarks]) => ({
-          subjectId,
-          maxMarks: Number(maxMarks)
-        }))
+        subjects: Object.keys(selectedSubjects)
+          .filter(subjectId => selectedSubjects[subjectId])
+          .map(subjectId => ({
+            subjectId,
+            maxMarks: Number(subjectMarks[subjectId] || 100)
+          }))
       };
       
-      await api.post('/academic/exams', payload);
-      // Reset form
-      setName('');
-      setDate('');
+      if (editingExamId) {
+        await api.put(`/academic/exams/${editingExamId}`, payload);
+        toast('Exam updated successfully!', 'success');
+      } else {
+        await api.post('/academic/exams', payload);
+        toast('Exam created successfully!', 'success');
+      }
+      
+      resetForm();
       fetchData();
-      toast('Exam created successfully!', 'success');
       setIsModalOpen(false);
     } catch (error) {
-      console.error('Failed to create exam:', error);
-      toast('Failed to create exam', 'error');
+      console.error('Failed to save exam:', error);
+      toast('Failed to save exam', 'error');
     }
   };
 
@@ -101,11 +152,11 @@ export default function ExamsPage() {
           <h2 className="text-3xl font-bold tracking-tight text-white mb-2">Exams Management</h2>
           <p className="text-muted-foreground">Create and manage JEE Mock Exams.</p>
         </div>
-        <Button onClick={() => setIsModalOpen(true)}>Add Exam</Button>
+        <Button onClick={() => { resetForm(); setIsModalOpen(true); }}>Add Exam</Button>
       </div>
 
-      <Modal isOpen={isModalOpen} onClose={() => setIsModalOpen(false)} title="Create New Exam">
-        <form onSubmit={handleCreateExam} className="space-y-4">
+      <Modal isOpen={isModalOpen} onClose={() => { resetForm(); setIsModalOpen(false); }} title={editingExamId ? "Edit Exam" : "Create New Exam"}>
+        <form onSubmit={handleSubmit} className="space-y-4">
           <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
             <div className="space-y-2">
               <label className="text-sm font-medium">Exam Name</label>
@@ -125,27 +176,40 @@ export default function ExamsPage() {
           </div>
 
           <div className="pt-4">
-            <h4 className="text-sm font-medium mb-3">Max Marks per Subject</h4>
+            <h4 className="text-sm font-medium mb-3">Select Subjects & Max Marks</h4>
             <div className="grid grid-cols-1 gap-4">
               {subjects.map(sub => (
-                <div key={sub.id} className="space-y-2 flex items-center justify-between">
-                  <label className="text-sm font-medium">{sub.name}</label>
-                  <Input 
-                    type="number" 
-                    required
-                    min={0}
-                    className="w-24"
-                    value={subjectMarks[sub.id] || ''} 
-                    onChange={e => setSubjectMarks({...subjectMarks, [sub.id]: Number(e.target.value)})} 
-                  />
+                <div key={sub.id} className="flex items-center justify-between p-2 rounded-lg border border-border/50 bg-black/20">
+                  <div className="flex items-center gap-3">
+                    <input 
+                      type="checkbox"
+                      className="w-4 h-4 rounded border-gray-300"
+                      checked={!!selectedSubjects[sub.id]}
+                      onChange={(e) => setSelectedSubjects({...selectedSubjects, [sub.id]: e.target.checked})}
+                    />
+                    <label className="text-sm font-medium">{sub.name}</label>
+                  </div>
+                  {selectedSubjects[sub.id] && (
+                    <div className="flex items-center gap-2">
+                      <label className="text-xs text-muted-foreground">Max:</label>
+                      <Input 
+                        type="number" 
+                        required
+                        min={0}
+                        className="w-20 h-8"
+                        value={subjectMarks[sub.id] === undefined ? '' : subjectMarks[sub.id]} 
+                        onChange={e => setSubjectMarks({...subjectMarks, [sub.id]: Number(e.target.value)})} 
+                      />
+                    </div>
+                  )}
                 </div>
               ))}
             </div>
           </div>
 
           <div className="flex justify-end gap-2 pt-4">
-            <Button type="button" variant="ghost" onClick={() => setIsModalOpen(false)}>Cancel</Button>
-            <Button type="submit">Create</Button>
+            <Button type="button" variant="ghost" onClick={() => { resetForm(); setIsModalOpen(false); }}>Cancel</Button>
+            <Button type="submit">{editingExamId ? 'Update Exam' : 'Create Exam'}</Button>
           </div>
         </form>
       </Modal>
@@ -181,23 +245,30 @@ export default function ExamsPage() {
                       </span>
                     </TableCell>
                     <TableCell>
-                      {exam.examSubjects.reduce((acc, curr) => acc + curr.maxMarks, 0)}
+                      {exam.examSubjects && exam.examSubjects.length > 0 
+                        ? exam.examSubjects.reduce((acc, curr) => acc + curr.maxMarks, 0) 
+                        : <span className="text-muted-foreground text-xs italic">N/A (Custom)</span>}
                     </TableCell>
                     <TableCell className="text-right">
-                      <Button variant="destructive" size="sm" onClick={() => async function() {
-                        if (confirm('Are you sure you want to delete this exam? All associated marks will also be deleted.')) {
-                          try {
-                            await api.delete(`/academic/exams/${exam.id}`);
-                            fetchData();
-                            toast('Exam deleted successfully', 'success');
-                          } catch (error) {
-                            console.error('Failed to delete exam', error);
-                            toast('Failed to delete exam', 'error');
+                      <div className="flex justify-end gap-2">
+                        <Button variant="outline" size="sm" onClick={() => handleEditClick(exam)}>
+                          Edit
+                        </Button>
+                        <Button variant="destructive" size="sm" onClick={() => async function() {
+                          if (confirm('Are you sure you want to delete this exam? All associated marks will also be deleted.')) {
+                            try {
+                              await api.delete(`/academic/exams/${exam.id}`);
+                              fetchData();
+                              toast('Exam deleted successfully', 'success');
+                            } catch (error) {
+                              console.error('Failed to delete exam', error);
+                              toast('Failed to delete exam', 'error');
+                            }
                           }
-                        }
-                      }()}>
-                        Delete
-                      </Button>
+                        }()}>
+                          Delete
+                        </Button>
+                      </div>
                     </TableCell>
                   </TableRow>
                 ))
