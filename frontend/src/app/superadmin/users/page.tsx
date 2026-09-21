@@ -4,20 +4,22 @@ import { useAuth, User } from "@/context/AuthContext";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
-import { LogOut, Plus, Trash2 } from "lucide-react";
+import { LogOut, Plus, Trash2, Edit2 } from "lucide-react";
 import { useEffect, useState } from "react";
 import { cn } from "@/lib/utils";
 import { Select } from "@/components/ui/select";
 import { Modal } from "@/components/ui/modal";
 import { userService } from "@/services/userService";
+import { useToast } from "@/context/ToastContext";
 
 export default function UserManagement() {
   const { user, logout } = useAuth();
   const [users, setUsers] = useState<User[]>([]);
   const [loading, setLoading] = useState(true);
-  const [newUser, setNewUser] = useState({ name: "", email: "", role: "admin" });
-  const [error, setError] = useState("");
+  const [newUser, setNewUser] = useState({ name: "", email: "", role: "student" });
+  const [editingUser, setEditingUser] = useState<User | null>(null);
   const [isModalOpen, setIsModalOpen] = useState(false);
+  const { toast } = useToast();
 
   useEffect(() => {
     fetchUsers();
@@ -36,18 +38,23 @@ export default function UserManagement() {
 
   const handleCreateUser = async (e: React.FormEvent) => {
     e.preventDefault();
-    setError("");
     try {
-      await userService.createUser(newUser);
-      setNewUser({ name: "", email: "", role: "admin" });
+      if (editingUser) {
+        await userService.updateUser(editingUser.id, newUser);
+        toast('User updated successfully', 'success');
+      } else {
+        await userService.createUser(newUser);
+        toast('User created successfully', 'success');
+      }
+      setNewUser({ name: "", email: "", role: "student" });
       fetchUsers();
       setIsModalOpen(false);
     } catch (err: any) {
       const msg = err.response?.data?.message;
       if (Array.isArray(msg)) {
-        setError(msg.join(', '));
+        toast(msg.join(', '), 'error');
       } else {
-        setError(msg || "Failed to create user");
+        toast(msg || "Failed to save user", 'error');
       }
     }
   };
@@ -56,9 +63,11 @@ export default function UserManagement() {
     if (confirm("Are you sure you want to delete this user?")) {
       try {
         await userService.deleteUser(id);
+        toast('User deleted successfully', 'success');
         fetchUsers();
       } catch (err) {
         console.error(err);
+        toast('Failed to delete user', 'error');
       }
     }
   };
@@ -67,7 +76,11 @@ export default function UserManagement() {
     <>
           <div className="flex justify-between items-center mb-6">
             <h1 className="text-3xl font-bold tracking-tight text-white text-glow">User Management</h1>
-            <Button onClick={() => setIsModalOpen(true)} className="h-10">
+            <Button onClick={() => {
+              setEditingUser(null);
+              setNewUser({ name: "", email: "", role: "student" });
+              setIsModalOpen(true);
+            }} className="h-10">
               <Plus className="mr-2 h-4 w-4" /> Add User
             </Button>
           </div>
@@ -116,6 +129,13 @@ export default function UserManagement() {
                       </div>
                     </TableCell>
                     <TableCell className="text-right">
+                      <Button variant="ghost" size="icon" onClick={() => {
+                        setEditingUser(u);
+                        setNewUser({ name: u.name, email: u.email, role: u.role });
+                        setIsModalOpen(true);
+                      }} className="hover:bg-primary/20 hover:text-primary">
+                        <Edit2 className="h-4 w-4" />
+                      </Button>
                       <Button variant="ghost" size="icon" onClick={() => handleDelete(u.id)} disabled={u.id === user?.id} className="hover:bg-destructive/20 hover:text-destructive">
                         <Trash2 className="h-4 w-4" />
                       </Button>
@@ -129,7 +149,7 @@ export default function UserManagement() {
           <Modal
             isOpen={isModalOpen}
             onClose={() => setIsModalOpen(false)}
-            title="Add New User"
+            title={editingUser ? "Edit User" : "Add New User"}
           >
             <form onSubmit={handleCreateUser} className="space-y-5 py-2">
               <div className="space-y-2">
@@ -142,23 +162,22 @@ export default function UserManagement() {
               </div>
               <div className="space-y-2">
                 <label className="text-sm font-semibold text-white/90">Role</label>
-                <Select 
-                  options={[
-                    { label: 'Admin', value: 'admin' },
-                    { label: 'Superadmin', value: 'superadmin' }
-                  ]}
+                  <Select 
+                    options={[
+                      { label: 'Student', value: 'student' },
+                      { label: 'Superadmin', value: 'superadmin' }
+                    ]}
                   value={newUser.role}
                   onChange={(val) => setNewUser({...newUser, role: val})}
                 />
               </div>
-              {error && <div className="text-sm text-destructive font-medium bg-destructive/10 p-3 rounded-md border border-destructive/20">{error}</div>}
               
               <div className="pt-4 flex items-center justify-between border-t border-white/10">
                 <p className="text-xs text-muted-foreground">Password defaults to Firstname@123</p>
                 <div className="space-x-3">
                   <Button type="button" variant="ghost" onClick={() => setIsModalOpen(false)}>Cancel</Button>
                   <Button type="submit" className="h-10 px-6">
-                    <Plus className="mr-2 h-4 w-4" /> Create
+                    {editingUser ? 'Update' : <><Plus className="mr-2 h-4 w-4" /> Create</>}
                   </Button>
                 </div>
               </div>

@@ -8,6 +8,7 @@ import { Input } from '@/components/ui/input';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import api from '@/lib/api';
 import { format } from 'date-fns';
+import { useToast } from '@/context/ToastContext';
 
 interface Exam {
   id: string;
@@ -29,6 +30,7 @@ export default function MarksEntryPage() {
   const [exams, setExams] = useState<Exam[]>([]);
   const [students, setStudents] = useState<Student[]>([]);
   const [selectedExamId, setSelectedExamId] = useState('');
+  const { toast } = useToast();
   
   // Marks data: studentId -> { status: 'PRESENT' | 'ABSENT', marks: { subjectId: value } }
   const [marksData, setMarksData] = useState<Record<string, any>>({});
@@ -45,12 +47,13 @@ export default function MarksEntryPage() {
         setStudents(usersRes.data.filter((u: any) => u.role === 'student'));
       } catch (error) {
         console.error('Failed to fetch initial data:', error);
+        toast('Failed to load data', 'error');
       } finally {
         setLoading(false);
       }
     };
     fetchData();
-  }, []);
+  }, [toast]);
 
   const handleExamChange = (examId: string) => {
     setSelectedExamId(examId);
@@ -69,7 +72,7 @@ export default function MarksEntryPage() {
         ...prev[studentId],
         marks: {
           ...prev[studentId].marks,
-          [subjectId]: value === '' ? 0 : Number(value)
+          [subjectId]: value === '' ? '' : Number(value)
         }
       }
     }));
@@ -87,17 +90,23 @@ export default function MarksEntryPage() {
 
   const handleSaveMarks = async () => {
     try {
-      const payload = Object.entries(marksData).map(([studentId, data]) => ({
-        studentId,
-        status: data.status,
-        marks: data.marks
-      }));
+      const payload = Object.entries(marksData).map(([studentId, data]) => {
+        const cleanedMarks: Record<string, number> = {};
+        for (const [subj, val] of Object.entries(data.marks as Record<string, any>)) {
+          cleanedMarks[subj] = val === '' ? 0 : Number(val);
+        }
+        return {
+          studentId,
+          status: data.status,
+          marks: cleanedMarks
+        };
+      });
 
       await api.post(`/academic/exams/${selectedExamId}/marks`, payload);
-      alert('Marks saved successfully!');
+      toast('Marks saved successfully!', 'success');
     } catch (error) {
       console.error('Failed to save marks:', error);
-      alert('Failed to save marks');
+      toast('Failed to save marks', 'error');
     }
   };
 
@@ -171,13 +180,14 @@ export default function MarksEntryPage() {
                           />
                         </TableCell>
                         {selectedExam.examSubjects.map(sub => (
-                          <TableCell key={sub.subject.id}>
-                            <Input
+                          <TableCell key={sub.subject.id} className="text-right">
+                            <input
                               type="number"
                               disabled={sData.status === 'ABSENT'}
                               value={sData.marks[sub.subject.id] === undefined ? '' : sData.marks[sub.subject.id]}
                               onChange={(e) => handleMarkChange(student.id, sub.subject.id, e.target.value)}
-                              className="w-24 ml-auto text-right"
+                              className="w-24 ml-auto text-right border-2 border-yellow-500/50 hover:border-yellow-400 focus:border-yellow-400 bg-black/50 text-white font-bold rounded-md p-2 transition-colors outline-none"
+                              placeholder="0"
                             />
                           </TableCell>
                         ))}

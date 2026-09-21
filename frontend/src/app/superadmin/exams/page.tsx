@@ -8,6 +8,8 @@ import { Select } from '@/components/ui/select';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import api from '@/lib/api';
 import { format } from 'date-fns';
+import { useToast } from '@/context/ToastContext';
+import { Modal } from '@/components/ui/modal';
 
 interface Subject {
   id: string;
@@ -29,6 +31,8 @@ export default function ExamsPage() {
   const [exams, setExams] = useState<Exam[]>([]);
   const [subjects, setSubjects] = useState<Subject[]>([]);
   const [loading, setLoading] = useState(true);
+  const { toast } = useToast();
+  const [isModalOpen, setIsModalOpen] = useState(false);
 
   // Form State
   const [name, setName] = useState('');
@@ -80,9 +84,11 @@ export default function ExamsPage() {
       setName('');
       setDate('');
       fetchData();
+      toast('Exam created successfully!', 'success');
+      setIsModalOpen(false);
     } catch (error) {
       console.error('Failed to create exam:', error);
-      alert('Failed to create exam');
+      toast('Failed to create exam', 'error');
     }
   };
 
@@ -90,57 +96,59 @@ export default function ExamsPage() {
 
   return (
     <div className="space-y-8">
-      <div>
-        <h2 className="text-3xl font-bold tracking-tight text-white mb-2">Exams Management</h2>
-        <p className="text-muted-foreground">Create and manage JEE Mock Exams.</p>
+      <div className="flex justify-between items-center mb-6">
+        <div>
+          <h2 className="text-3xl font-bold tracking-tight text-white mb-2">Exams Management</h2>
+          <p className="text-muted-foreground">Create and manage JEE Mock Exams.</p>
+        </div>
+        <Button onClick={() => setIsModalOpen(true)}>Add Exam</Button>
       </div>
 
-      <Card>
-        <CardHeader>
-          <CardTitle>Create New Exam</CardTitle>
-        </CardHeader>
-        <CardContent>
-          <form onSubmit={handleCreateExam} className="space-y-4">
-            <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-              <div className="space-y-2">
-                <label className="text-sm font-medium">Exam Name</label>
-                <Input required value={name} onChange={e => setName(e.target.value)} placeholder="e.g. AITS Mains Test 1" />
-              </div>
-              <div className="space-y-2">
-                <label className="text-sm font-medium">Date</label>
-                <Input required type="date" value={date} onChange={e => setDate(e.target.value)} />
-              </div>
-              <div className="space-y-2">
-                <label className="text-sm font-medium">Exam Type</label>
-                <Select value={type} onChange={value => setType(value)} options={[
-                  { value: 'MAINS', label: 'JEE Mains' },
-                  { value: 'ADVANCED', label: 'JEE Advanced' }
-                ]} />
-              </div>
+      <Modal isOpen={isModalOpen} onClose={() => setIsModalOpen(false)} title="Create New Exam">
+        <form onSubmit={handleCreateExam} className="space-y-4">
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+            <div className="space-y-2">
+              <label className="text-sm font-medium">Exam Name</label>
+              <Input required value={name} onChange={e => setName(e.target.value)} placeholder="e.g. AITS Mains Test 1" />
             </div>
-
-            <div className="pt-4">
-              <h4 className="text-sm font-medium mb-3">Max Marks per Subject</h4>
-              <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-                {subjects.map(sub => (
-                  <div key={sub.id} className="space-y-2">
-                    <label className="text-xs text-muted-foreground">{sub.name}</label>
-                    <Input 
-                      type="number" 
-                      required
-                      min={0}
-                      value={subjectMarks[sub.id] || ''} 
-                      onChange={e => setSubjectMarks({...subjectMarks, [sub.id]: Number(e.target.value)})} 
-                    />
-                  </div>
-                ))}
-              </div>
+            <div className="space-y-2">
+              <label className="text-sm font-medium">Date</label>
+              <Input required type="date" value={date} onChange={e => setDate(e.target.value)} />
             </div>
+            <div className="space-y-2 md:col-span-2">
+              <label className="text-sm font-medium">Exam Type</label>
+              <Select value={type} onChange={value => setType(value)} options={[
+                { value: 'MAINS', label: 'JEE Mains' },
+                { value: 'ADVANCED', label: 'JEE Advanced' }
+              ]} />
+            </div>
+          </div>
 
-            <Button type="submit" className="w-full md:w-auto">Create Exam</Button>
-          </form>
-        </CardContent>
-      </Card>
+          <div className="pt-4">
+            <h4 className="text-sm font-medium mb-3">Max Marks per Subject</h4>
+            <div className="grid grid-cols-1 gap-4">
+              {subjects.map(sub => (
+                <div key={sub.id} className="space-y-2 flex items-center justify-between">
+                  <label className="text-sm font-medium">{sub.name}</label>
+                  <Input 
+                    type="number" 
+                    required
+                    min={0}
+                    className="w-24"
+                    value={subjectMarks[sub.id] || ''} 
+                    onChange={e => setSubjectMarks({...subjectMarks, [sub.id]: Number(e.target.value)})} 
+                  />
+                </div>
+              ))}
+            </div>
+          </div>
+
+          <div className="flex justify-end gap-2 pt-4">
+            <Button type="button" variant="ghost" onClick={() => setIsModalOpen(false)}>Cancel</Button>
+            <Button type="submit">Create</Button>
+          </div>
+        </form>
+      </Modal>
 
       <Card>
         <CardHeader>
@@ -181,9 +189,10 @@ export default function ExamsPage() {
                           try {
                             await api.delete(`/academic/exams/${exam.id}`);
                             fetchData();
+                            toast('Exam deleted successfully', 'success');
                           } catch (error) {
                             console.error('Failed to delete exam', error);
-                            alert('Failed to delete exam');
+                            toast('Failed to delete exam', 'error');
                           }
                         }
                       }()}>

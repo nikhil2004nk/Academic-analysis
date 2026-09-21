@@ -2,7 +2,7 @@ import React, { useState } from 'react';
 import Link from 'next/link';
 import { usePathname } from 'next/navigation';
 import { useAuth } from '@/context/AuthContext';
-import { LayoutDashboard, Users, LogOut, ChevronLeft, ChevronRight, Key, ClipboardList, Edit3 } from 'lucide-react';
+import { LayoutDashboard, Users, LogOut, ChevronLeft, ChevronRight, Key, ClipboardList, Edit3, BookOpen } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { Button } from '../ui/button';
 import { ChangePasswordModal } from '../auth/ChangePasswordModal';
@@ -18,6 +18,7 @@ export function Sidebar() {
     ...(user?.role === 'superadmin' 
       ? [
           { name: 'User Management', href: '/superadmin/users', icon: Users },
+          { name: 'Subjects', href: '/superadmin/subjects', icon: BookOpen },
           { name: 'Exams', href: '/superadmin/exams', icon: ClipboardList },
           { name: 'Marks Entry', href: '/superadmin/marks', icon: Edit3 },
         ]

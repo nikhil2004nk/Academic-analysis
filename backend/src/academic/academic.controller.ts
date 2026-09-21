@@ -17,6 +17,24 @@ export class AcademicController {
     return this.academicService.findAllSubjects();
   }
 
+  @Post('subjects')
+  @Roles(Role.SUPERADMIN)
+  createSubject(@Body('name') name: string) {
+    return this.academicService.createSubject(name);
+  }
+
+  @Post('subjects/:id')
+  @Roles(Role.SUPERADMIN)
+  updateSubject(@Param('id') id: string, @Body('name') name: string) {
+    return this.academicService.updateSubject(id, name);
+  }
+
+  @Delete('subjects/:id')
+  @Roles(Role.SUPERADMIN)
+  deleteSubject(@Param('id') id: string) {
+    return this.academicService.deleteSubject(id);
+  }
+
   @Post('exams')
   @Roles(Role.SUPERADMIN)
   createExam(@Body() createExamDto: CreateExamDto) {

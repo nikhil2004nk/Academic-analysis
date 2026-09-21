@@ -34,6 +34,21 @@ export class AcademicService {
     return this.subjectRepository.find({ order: { name: 'ASC' } });
   }
 
+  async createSubject(name: string) {
+    if (!name) throw new BadRequestException('Subject name is required');
+    return this.subjectRepository.save({ name });
+  }
+
+  async updateSubject(id: string, name: string) {
+    if (!name) throw new BadRequestException('Subject name is required');
+    await this.subjectRepository.update(id, { name });
+    return this.subjectRepository.findOne({ where: { id } });
+  }
+
+  async deleteSubject(id: string) {
+    return this.subjectRepository.delete(id);
+  }
+
   async createExam(createExamDto: CreateExamDto) {
     const exam = this.examRepository.create({
       name: createExamDto.name,

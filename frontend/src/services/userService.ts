@@ -25,6 +25,14 @@ export const userService = {
   },
 
   /**
+   * Update an existing user
+   */
+  async updateUser(id: string, data: Partial<CreateUserPayload>): Promise<User> {
+    const response = await api.patch(`/users/${id}`, data);
+    return response.data;
+  },
+
+  /**
    * Delete a user by ID
    */
   /**
