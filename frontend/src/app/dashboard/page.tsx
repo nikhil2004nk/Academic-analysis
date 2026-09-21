@@ -22,6 +22,9 @@ function StudentDashboard({ userId }: { userId: string }) {
   const [results, setResults] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
   const [expandedExamId, setExpandedExamId] = useState<string | null>(null);
+  
+  type ModalType = 'attendance' | 'subject' | 'exam' | null;
+  const [modalData, setModalData] = useState<{ type: ModalType, title: string, payload: any } | null>(null);
 
   const toggleExpand = (id: string) => {
     setExpandedExamId(prev => prev === id ? null : id);
@@ -173,7 +176,7 @@ function StudentDashboard({ userId }: { userId: string }) {
     <div className="space-y-6">
       {/* Metrics Row */}
       <div className="grid gap-6 md:grid-cols-2 lg:grid-cols-5">
-        <Card className="bg-white/5 border-white/10">
+        <Card className="bg-white/5 border-white/10 cursor-pointer hover:bg-white/10 transition-colors" onClick={() => setModalData({ type: 'attendance', title: 'Exam History', payload: 'all' })}>
           <CardHeader className="pb-2">
             <CardTitle className="text-sm font-medium text-muted-foreground">Exams Taken</CardTitle>
           </CardHeader>
@@ -182,7 +185,7 @@ function StudentDashboard({ userId }: { userId: string }) {
           </CardContent>
         </Card>
         
-        <Card className="bg-white/5 border-white/10">
+        <Card className="bg-white/5 border-white/10 cursor-pointer hover:bg-white/10 transition-colors" onClick={() => setModalData({ type: 'attendance', title: 'Attendance Details', payload: 'attendance' })}>
           <CardHeader className="pb-2">
             <CardTitle className="text-sm font-medium text-muted-foreground">Attendance</CardTitle>
           </CardHeader>
@@ -201,7 +204,7 @@ function StudentDashboard({ userId }: { userId: string }) {
           </CardContent>
         </Card>
 
-        <Card className="bg-green-500/10 border-green-500/20">
+        <Card className="bg-green-500/10 border-green-500/20 cursor-pointer hover:bg-green-500/20 transition-colors" onClick={() => bestSubject.name !== '-' && setModalData({ type: 'subject', title: `${bestSubject.name} Details`, payload: bestSubject.name })}>
           <CardHeader className="pb-2">
             <CardTitle className="text-sm font-medium text-green-400">Strongest Subject</CardTitle>
           </CardHeader>
@@ -211,7 +214,7 @@ function StudentDashboard({ userId }: { userId: string }) {
           </CardContent>
         </Card>
 
-        <Card className="bg-red-500/10 border-red-500/20">
+        <Card className="bg-red-500/10 border-red-500/20 cursor-pointer hover:bg-red-500/20 transition-colors" onClick={() => worstSubject.name !== '-' && setModalData({ type: 'subject', title: `${worstSubject.name} Details`, payload: worstSubject.name })}>
           <CardHeader className="pb-2">
             <CardTitle className="text-sm font-medium text-red-400">Needs Improvement</CardTitle>
           </CardHeader>
@@ -242,6 +245,8 @@ function StudentDashboard({ userId }: { userId: string }) {
                     paddingAngle={5}
                     dataKey="value"
                     stroke="none"
+                    onClick={() => setModalData({ type: 'attendance', title: 'Attendance Details', payload: 'attendance' })}
+                    className="cursor-pointer"
                   >
                     {attendanceData.map((entry, index) => (
                       <Cell key={`cell-${index}`} fill={PIE_COLORS[index % PIE_COLORS.length]} />
@@ -273,9 +278,15 @@ function StudentDashboard({ userId }: { userId: string }) {
                   <XAxis dataKey="name" stroke="rgba(255,255,255,0.5)" tick={{fill: 'rgba(255,255,255,0.7)', fontSize: 12}} />
                   <YAxis stroke="rgba(255,255,255,0.5)" tick={{fill: 'rgba(255,255,255,0.7)', fontSize: 12}} domain={[0, 100]} />
                   <RechartsTooltip content={<CustomBarTooltip />} cursor={{fill: 'rgba(255,255,255,0.05)'}} />
-                  <Bar dataKey="percentage" name="Average %" radius={[4, 4, 0, 0]}>
+                  <Bar 
+                    dataKey="percentage" 
+                    name="Average %" 
+                    radius={[4, 4, 0, 0]} 
+                    onClick={(data: any) => setModalData({ type: 'subject', title: `${data.name} Details`, payload: data.name })}
+                    className="cursor-pointer"
+                  >
                     {subjectPerformance.map((entry, index) => (
-                      <Cell key={`cell-${index}`} fill={subjectColorMap[entry.name] || '#3b82f6'} />
+                      <Cell key={`cell-${index}`} fill={subjectColorMap[entry.name] || '#3b82f6'} className="cursor-pointer hover:opacity-80 transition-opacity" />
                     ))}
                   </Bar>
                 </BarChart>
@@ -402,6 +413,95 @@ function StudentDashboard({ userId }: { userId: string }) {
           </div>
         </CardContent>
       </Card>
+
+      {/* Modal Overlay */}
+      {modalData && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/80 backdrop-blur-sm p-4">
+          <div className="bg-[#111] border border-white/10 w-full max-w-2xl rounded-xl shadow-2xl flex flex-col max-h-[80vh]">
+            <div className="flex justify-between items-center p-6 border-b border-white/10">
+              <h2 className="text-xl font-bold text-white">{modalData.title}</h2>
+              <button 
+                onClick={() => setModalData(null)}
+                className="text-muted-foreground hover:text-white transition-colors"
+              >
+                ✕
+              </button>
+            </div>
+            
+            <div className="p-6 overflow-y-auto">
+              {/* Subject Detail View */}
+              {modalData.type === 'subject' && (() => {
+                const subName = modalData.payload;
+                const relevantExams = presentExams.filter(e => e.subjectMarks.some((sm: any) => sm.subject.name === subName));
+                
+                return (
+                  <div className="space-y-4">
+                    <p className="text-sm text-muted-foreground mb-4">Detailed breakdown for {subName} across all attended exams.</p>
+                    <div className="space-y-2">
+                      {relevantExams.map(exam => {
+                        const sm = exam.subjectMarks.find((s: any) => s.subject.name === subName);
+                        const examSubject = exam.exam.examSubjects?.find((es: any) => es.subjectId === sm.subjectId);
+                        const max = examSubject ? examSubject.maxMarks : 100;
+                        const pct = (sm.marksObtained / max) * 100;
+                        
+                        return (
+                          <div key={exam.id} className="flex justify-between items-center bg-white/5 p-4 rounded-lg border border-white/5">
+                            <div>
+                              <div className="font-medium text-white/90">{exam.exam.name}</div>
+                              <div className="text-xs text-muted-foreground">{format(new Date(exam.exam.date), 'MMM dd, yyyy')}</div>
+                            </div>
+                            <div className="text-right">
+                              <div className="text-lg font-bold text-yellow-500">{sm.marksObtained} <span className="text-sm text-muted-foreground font-normal">/ {max}</span></div>
+                              <div className="text-xs font-medium text-white/70">{pct.toFixed(1)}%</div>
+                            </div>
+                          </div>
+                        );
+                      })}
+                    </div>
+                  </div>
+                );
+              })()}
+
+              {/* Attendance Detail View */}
+              {modalData.type === 'attendance' && (
+                <div className="space-y-6">
+                  <div>
+                    <h3 className="text-sm font-semibold text-green-400 mb-3 flex items-center gap-2">
+                      <div className="w-2 h-2 rounded-full bg-green-500"></div> 
+                      Present Exams ({presentCount})
+                    </h3>
+                    <div className="grid grid-cols-1 md:grid-cols-2 gap-2">
+                      {presentExams.map(exam => (
+                        <div key={exam.id} className="bg-white/5 p-3 rounded-md border border-white/5 text-sm">
+                          <span className="font-medium">{exam.exam.name}</span>
+                          <div className="text-xs text-muted-foreground mt-1">{format(new Date(exam.exam.date), 'MMM dd, yyyy')}</div>
+                        </div>
+                      ))}
+                      {presentExams.length === 0 && <div className="text-sm text-muted-foreground">No records</div>}
+                    </div>
+                  </div>
+
+                  <div>
+                    <h3 className="text-sm font-semibold text-red-400 mb-3 flex items-center gap-2">
+                      <div className="w-2 h-2 rounded-full bg-red-500"></div> 
+                      Absent Exams ({absentCount})
+                    </h3>
+                    <div className="grid grid-cols-1 md:grid-cols-2 gap-2">
+                      {results.filter(r => r.status === 'ABSENT').map(exam => (
+                        <div key={exam.id} className="bg-white/5 p-3 rounded-md border border-white/5 text-sm">
+                          <span className="font-medium">{exam.exam.name}</span>
+                          <div className="text-xs text-muted-foreground mt-1">{format(new Date(exam.exam.date), 'MMM dd, yyyy')}</div>
+                        </div>
+                      ))}
+                      {absentCount === 0 && <div className="text-sm text-muted-foreground">No records</div>}
+                    </div>
+                  </div>
+                </div>
+              )}
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 }

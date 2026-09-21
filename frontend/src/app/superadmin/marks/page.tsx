@@ -14,6 +14,7 @@ interface Exam {
   id: string;
   name: string;
   date: string;
+  type: string;
   examSubjects: {
     subject: { id: string, name: string };
     maxMarks: number;
@@ -433,6 +434,42 @@ export default function MarksEntryPage() {
     XLSX.writeFile(wb, "marks_import_template.xlsx");
   };
 
+  const handleExportMarks = () => {
+    if (!selectedStudentId) return;
+    
+    const exportData = exams.map(exam => {
+      const eData = marksData[exam.id];
+      if (!eData) return null;
+      
+      const row: any = {
+        'Exam Name': exam.name,
+        'Date': format(new Date(exam.date), 'yyyy-MM-dd'),
+        'Exam Type': exam.type || 'MAINS',
+        'Attendance': eData.status,
+        'Total Max Marks': eData.totalMaxMarks !== null && eData.totalMaxMarks !== undefined ? eData.totalMaxMarks : exam.examSubjects.reduce((acc, curr) => acc + curr.maxMarks, 0) || 0,
+        'Total Obtained Marks': eData.totalObtainedMarks !== null && eData.totalObtainedMarks !== undefined ? eData.totalObtainedMarks : Object.values(eData.marks).reduce((acc: any, curr: any) => acc + (Number(curr) || 0), 0)
+      };
+      
+      if (exam.examSubjects.length > 0) {
+        exam.examSubjects.forEach(sub => {
+          row[sub.subject.name] = eData.marks[sub.subject.id] !== undefined ? eData.marks[sub.subject.id] : '';
+        });
+      }
+      return row;
+    }).filter(Boolean);
+    
+    if (exportData.length === 0) {
+      toast('No data to export', 'error');
+      return;
+    }
+    
+    const ws = XLSX.utils.json_to_sheet(exportData);
+    const wb = XLSX.utils.book_new();
+    const student = students.find(s => s.id === selectedStudentId);
+    XLSX.utils.book_append_sheet(wb, ws, "MarksExport");
+    XLSX.writeFile(wb, `${student?.name.replace(/ /g, '_')}_marks_export.xlsx`);
+  };
+
   if (loading) return <div className="p-8 text-center text-muted-foreground animate-pulse">Loading...</div>;
 
   return (
@@ -621,6 +658,7 @@ export default function MarksEntryPage() {
                   <Button variant="ghost" className="text-muted-foreground hover:text-white" onClick={handleDownloadTemplate}>
                     Download Template
                   </Button>
+                  <Button variant="outline" onClick={handleExportMarks}>Export Excel</Button>
                   <Button variant="outline" onClick={() => setIsUploadModalOpen(true)}>Import Excel</Button>
                   <Button onClick={handleSaveMarks}>Save Marks</Button>
                 </div>
