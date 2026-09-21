@@ -13,6 +13,7 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@
 import { ChevronDown, ChevronUp, ArrowUpDown } from "lucide-react";
 import { Select } from "@/components/ui/select";
 import { MonthPicker } from "@/components/ui/month-picker";
+import { cn } from "@/lib/utils";
 
 const PIE_COLORS = ['#22c55e', '#ef4444'];
 const SUBJECT_COLORS = [
@@ -156,6 +157,9 @@ function StudentDashboard({ userId, headerContent }: { userId: string, headerCon
   const overallAvgPercentage = totalMaxMarks > 0
     ? (totalMarksObtained / totalMaxMarks) * 100
     : 0;
+
+  // --- 1.5 MoM Growth Indicator (from Backend) ---
+  const momIndicator = analysis?.momIndicator;
 
   // --- 2. Subject-wise Analytics ---
   const subjectStats: Record<string, { totalObtained: number, totalMax: number, count: number }> = {};
@@ -387,7 +391,18 @@ function StudentDashboard({ userId, headerContent }: { userId: string, headerCon
             <CardTitle className="text-xs sm:text-sm font-medium text-muted-foreground">Avg Performance</CardTitle>
           </CardHeader>
           <CardContent>
-            <div className="text-xl md:text-2xl font-bold text-yellow-500">{overallAvgPercentage.toFixed(1)}%</div>
+            <div className="flex items-center gap-2">
+              <div className="text-xl md:text-2xl font-bold text-yellow-500">{overallAvgPercentage.toFixed(1)}%</div>
+              {momIndicator && (
+                <span className={cn(
+                  "text-[10px] font-bold px-1.5 py-0.5 rounded",
+                  momIndicator.isPositive ? "bg-green-500/20 text-green-400" : "bg-red-500/20 text-red-400"
+                )}>
+                  {momIndicator.isPositive ? '↑' : '↓'} {Math.abs(momIndicator.diff)}%
+                </span>
+              )}
+            </div>
+            {momIndicator && <p className="text-[10px] text-muted-foreground mt-1">vs prev month</p>}
           </CardContent>
         </Card>
 
@@ -900,6 +915,67 @@ function StudentDashboard({ userId, headerContent }: { userId: string, headerCon
   );
 }
 
+function AdminDashboardWrapper({ user, headerContent }: { user: any, headerContent: React.ReactNode }) {
+  const [students, setStudents] = useState<any[]>([]);
+  const [selectedStudentId, setSelectedStudentId] = useState<string>('');
+  const [loading, setLoading] = useState(true);
+
+  useEffect(() => {
+    const fetchStudents = async () => {
+      try {
+        const res = await api.get('/users');
+        const studentsList = res.data.filter((u: any) => u.role === 'student');
+        setStudents(studentsList);
+        if (studentsList.length > 0) {
+          setSelectedStudentId(studentsList[0].id);
+        }
+      } catch (err) {
+        console.error(err);
+      } finally {
+        setLoading(false);
+      }
+    };
+    fetchStudents();
+  }, []);
+
+  if (loading) return <div className="p-8 text-center text-muted-foreground animate-pulse">Loading dashboard...</div>;
+
+  const adminHeaderContent = (
+    <div className="flex flex-col gap-4">
+      <div>
+        <h1 className="text-3xl font-bold tracking-tight text-white text-glow">Dashboard</h1>
+        <p className="text-muted-foreground mt-2">
+          Welcome back to the Academics portal, <span className="font-semibold text-primary">{user?.name || 'Admin'}</span>.
+        </p>
+      </div>
+      <div className="w-full sm:w-80 mt-2">
+        <label className="text-sm font-semibold text-white/90 mb-1.5 block">View Dashboard For Student:</label>
+        <Select
+          options={students.map(s => ({ value: s.id, label: `${s.name} (${s.email})` }))}
+          value={selectedStudentId}
+          onChange={setSelectedStudentId}
+          placeholder="Select a student"
+        />
+      </div>
+    </div>
+  );
+
+  if (!selectedStudentId) {
+    return (
+      <div className="space-y-6">
+        {adminHeaderContent}
+        <Card className="glass">
+          <CardContent className="p-8 text-center text-muted-foreground">
+            No students found in the system.
+          </CardContent>
+        </Card>
+      </div>
+    );
+  }
+
+  return <StudentDashboard userId={selectedStudentId} headerContent={adminHeaderContent} />;
+}
+
 export default function Dashboard() {
   const { user } = useAuth();
 
@@ -907,7 +983,7 @@ export default function Dashboard() {
     <div>
       <h1 className="text-3xl font-bold tracking-tight text-white text-glow">Dashboard</h1>
       <p className="text-muted-foreground mt-2">
-        Welcome back to the Academics portal, <span className="font-semibold text-primary">{user?.name}</span>.
+        Welcome back to the Academics portal, <span className="font-semibold text-primary">{user?.name || 'Student'}</span>.
       </p>
     </div>
   );
@@ -915,31 +991,7 @@ export default function Dashboard() {
   return (
     <div className="space-y-6">
       {user?.role === 'superadmin' ? (
-        <>
-          {headerContent}
-          <div className="grid gap-6 md:grid-cols-2 lg:grid-cols-3">
-            <Card className="animate-hover">
-              <CardHeader>
-                <CardTitle className="text-lg">Your Role</CardTitle>
-              </CardHeader>
-              <CardContent>
-                <p className="text-3xl font-bold text-primary capitalize">{user?.role}</p>
-              </CardContent>
-            </Card>
-
-            <Card className="animate-hover">
-              <CardHeader>
-                <CardTitle className="text-lg">System Status</CardTitle>
-              </CardHeader>
-              <CardContent>
-                <div className="flex items-center gap-2">
-                  <div className="w-3 h-3 rounded-full bg-green-500 shadow-[0_0_10px_rgba(34,197,94,0.5)]"></div>
-                  <p className="text-xl font-bold text-white">All systems operational</p>
-                </div>
-              </CardContent>
-            </Card>
-          </div>
-        </>
+        <AdminDashboardWrapper user={user} headerContent={headerContent} />
       ) : (
         <StudentDashboard userId={user?.id || ''} headerContent={headerContent} />
       )}

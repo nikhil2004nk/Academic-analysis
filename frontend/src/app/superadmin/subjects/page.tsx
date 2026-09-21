@@ -12,6 +12,7 @@ import api from '@/lib/api';
 interface Subject {
   id: string;
   name: string;
+  isActive?: boolean;
 }
 
 export default function SubjectsPage() {
@@ -83,6 +84,17 @@ export default function SubjectsPage() {
     }
   };
 
+  const handleToggleActive = async (id: string) => {
+    try {
+      await api.post(`/academic/subjects/${id}/toggle-active`);
+      fetchSubjects();
+      toast('Subject status updated successfully', 'success');
+    } catch (error) {
+      console.error('Failed to update subject status', error);
+      toast('Failed to update subject status', 'error');
+    }
+  };
+
   if (loading) return <div className="p-8 text-center text-muted-foreground animate-pulse">Loading...</div>;
 
   return (
@@ -100,8 +112,18 @@ export default function SubjectsPage() {
         }} className="w-full sm:w-auto">Add Subject</Button>
       </div>
 
-      <Modal isOpen={isModalOpen} onClose={() => setIsModalOpen(false)} title={editingId ? 'Edit Subject' : 'Add New Subject'}>
-        <form onSubmit={handleSubmit} className="space-y-4">
+      <Modal 
+        isOpen={isModalOpen} 
+        onClose={() => setIsModalOpen(false)} 
+        title={editingId ? 'Edit Subject' : 'Add New Subject'}
+        footer={
+          <div className="flex justify-end gap-3 w-full">
+            <Button type="button" variant="outline" onClick={() => setIsModalOpen(false)}>Cancel</Button>
+            <Button type="submit" form="subject-form" disabled={!isDirty}>{editingId ? 'Update' : 'Create'}</Button>
+          </div>
+        }
+      >
+        <form id="subject-form" onSubmit={handleSubmit} className="space-y-4">
           <div className="space-y-2">
             <label className="text-sm font-medium">Subject Name</label>
             <Input 
@@ -110,10 +132,6 @@ export default function SubjectsPage() {
               onChange={e => setName(e.target.value)} 
               placeholder="e.g. Biology" 
             />
-          </div>
-          <div className="flex justify-end gap-3 pt-4 border-t border-border/50">
-            <Button type="button" variant="outline" onClick={() => setIsModalOpen(false)}>Cancel</Button>
-            <Button type="submit" disabled={!isDirty}>{editingId ? 'Update' : 'Create'}</Button>
           </div>
         </form>
       </Modal>
@@ -127,7 +145,6 @@ export default function SubjectsPage() {
             <Table>
               <TableHeader>
                 <TableRow>
-                  <TableHead className="w-[100px]">ID</TableHead>
                   <TableHead>Subject Name</TableHead>
                   <TableHead className="text-right">Actions</TableHead>
                 </TableRow>
@@ -135,14 +152,23 @@ export default function SubjectsPage() {
               <TableBody>
                 {subjects.length === 0 ? (
                   <TableRow>
-                    <TableCell colSpan={3} className="text-center py-8 text-muted-foreground">No subjects found.</TableCell>
+                    <TableCell colSpan={2} className="text-center py-8 text-muted-foreground">No subjects found.</TableCell>
                   </TableRow>
                 ) : (
                   subjects.map((sub) => (
-                    <TableRow key={sub.id}>
-                      <TableCell className="font-mono text-xs">{sub.id}</TableCell>
-                      <TableCell className="font-medium">{sub.name}</TableCell>
+                    <TableRow key={sub.id} className={!sub.isActive ? "opacity-50" : ""}>
+                      <TableCell className="font-medium">
+                        {sub.name}
+                        {!sub.isActive && (
+                          <span className="ml-2 text-[10px] bg-red-500/20 text-red-500 px-2 py-0.5 rounded uppercase font-bold">
+                            Inactive
+                          </span>
+                        )}
+                      </TableCell>
                       <TableCell className="text-right space-x-2">
+                        <Button variant="outline" size="sm" onClick={() => handleToggleActive(sub.id)}>
+                          {sub.isActive ? 'Deactivate' : 'Activate'}
+                        </Button>
                         <Button variant="outline" size="sm" onClick={() => handleEdit(sub)}>
                           Edit
                         </Button>

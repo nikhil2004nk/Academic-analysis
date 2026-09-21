@@ -30,8 +30,9 @@ export class AcademicService {
     }
   }
 
-  async findAllSubjects() {
-    return this.subjectRepository.find({ order: { name: 'ASC' } });
+  async findAllSubjects(activeOnly: boolean = false) {
+    const where = activeOnly ? { isActive: true } : {};
+    return this.subjectRepository.find({ where, order: { name: 'ASC' } });
   }
 
   async createSubject(name: string) {
@@ -42,6 +43,13 @@ export class AcademicService {
   async updateSubject(id: string, name: string) {
     if (!name) throw new BadRequestException('Subject name is required');
     await this.subjectRepository.update(id, { name });
+    return this.subjectRepository.findOne({ where: { id } });
+  }
+
+  async toggleSubjectActive(id: string) {
+    const subject = await this.subjectRepository.findOne({ where: { id } });
+    if (!subject) throw new BadRequestException('Subject not found');
+    await this.subjectRepository.update(id, { isActive: !subject.isActive });
     return this.subjectRepository.findOne({ where: { id } });
   }
 
@@ -409,16 +417,9 @@ export class AcademicService {
   }
 
   async getStudentDashboard(studentId: string, startDate?: string, endDate?: string) {
-    const whereClause: any = { studentId };
-    
-    if (startDate && endDate) {
-      whereClause.exam = {
-        date: Between(new Date(startDate), new Date(endDate))
-      };
-    }
-
-    const results = await this.examResultRepository.find({
-      where: whereClause,
+    // Fetch all results to calculate global trends (like MoM) accurately regardless of filters
+    const allResults = await this.examResultRepository.find({
+      where: { studentId },
       relations: {
         exam: {
           examSubjects: true,
@@ -429,6 +430,52 @@ export class AcademicService {
       },
       order: { exam: { date: 'ASC' } },
     });
+
+    const globalMonthStats: Record<string, { totalObtained: number, totalMax: number }> = {};
+    allResults.forEach(r => {
+      if (r.status !== AttendanceStatus.PRESENT) return;
+      const d = new Date(r.exam.date);
+      const monthKey = `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}`;
+      if (!globalMonthStats[monthKey]) {
+        globalMonthStats[monthKey] = { totalObtained: 0, totalMax: 0 };
+      }
+      globalMonthStats[monthKey].totalObtained += r.totalMarksObtained || 0;
+      globalMonthStats[monthKey].totalMax += r.totalMaxMarks || 0;
+    });
+
+    const sortedMonths = Object.keys(globalMonthStats).sort((a, b) => b.localeCompare(a));
+    let momIndicator: { diff: number; isPositive: boolean } | null = null;
+    let targetMonth = sortedMonths.length > 0 ? sortedMonths[0] : null;
+
+    if (startDate && endDate) {
+       const d = new Date(endDate);
+       targetMonth = `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}`;
+    }
+
+    if (targetMonth) {
+       const targetIndex = sortedMonths.indexOf(targetMonth);
+       if (targetIndex >= 0 && targetIndex + 1 < sortedMonths.length) {
+          const currentStats = globalMonthStats[sortedMonths[targetIndex]];
+          const prevStats = globalMonthStats[sortedMonths[targetIndex + 1]];
+          const currentPct = currentStats.totalMax > 0 ? (currentStats.totalObtained / currentStats.totalMax) * 100 : 0;
+          const prevPct = prevStats.totalMax > 0 ? (prevStats.totalObtained / prevStats.totalMax) * 100 : 0;
+          const diff = currentPct - prevPct;
+          momIndicator = {
+            diff: Number(diff.toFixed(1)),
+            isPositive: diff >= 0
+          };
+       }
+    }
+
+    let results = allResults;
+    if (startDate && endDate) {
+      const startMs = new Date(startDate).getTime();
+      const endMs = new Date(endDate).getTime();
+      results = allResults.filter(r => {
+        const t = new Date(r.exam.date).getTime();
+        return t >= startMs && t <= endMs;
+      });
+    }
 
     const presentExams = results.filter(r => r.status === AttendanceStatus.PRESENT);
     const typeStats: Record<string, { totalObtained: number, totalMax: number, count: number }> = {};
@@ -497,7 +544,7 @@ export class AcademicService {
       }
     });
 
-    const analysis = { highestExam, lowestExam, bestMonth };
+    const analysis = { highestExam, lowestExam, bestMonth, momIndicator };
 
     return { results, typePerformance, analysis };
   }

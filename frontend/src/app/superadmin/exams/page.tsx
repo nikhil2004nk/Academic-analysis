@@ -5,6 +5,7 @@ import { Card, CardHeader, CardTitle, CardContent } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Select } from '@/components/ui/select';
+import { DatePicker } from '@/components/ui/date-picker';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import api from '@/lib/api';
 import { format } from 'date-fns';
@@ -54,7 +55,7 @@ export default function ExamsPage() {
     try {
       const [examsRes, subjectsRes] = await Promise.all([
         api.get('/academic/exams'),
-        api.get('/academic/subjects')
+        api.get('/academic/subjects?activeOnly=true')
       ]);
       setExams(examsRes.data);
       setSubjects(subjectsRes.data);
@@ -165,16 +166,26 @@ export default function ExamsPage() {
         <Button onClick={() => { resetForm(); setIsModalOpen(true); }} className="w-full sm:w-auto">Add Exam</Button>
       </div>
 
-      <Modal isOpen={isModalOpen} onClose={() => { resetForm(); setIsModalOpen(false); }} title={editingExamId ? "Edit Exam" : "Create New Exam"}>
-        <form onSubmit={handleSubmit} className="space-y-4">
+      <Modal 
+        isOpen={isModalOpen} 
+        onClose={() => { resetForm(); setIsModalOpen(false); }} 
+        title={editingExamId ? "Edit Exam" : "Create New Exam"}
+        footer={
+          <div className="flex justify-end gap-3 w-full">
+            <Button type="button" variant="outline" onClick={() => { resetForm(); setIsModalOpen(false); }}>Cancel</Button>
+            <Button type="submit" form="exam-form" disabled={!isDirty}>{editingExamId ? 'Update Exam' : 'Create Exam'}</Button>
+          </div>
+        }
+      >
+        <form id="exam-form" onSubmit={handleSubmit} className="space-y-4">
           <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
             <div className="space-y-2">
               <label className="text-sm font-medium">Exam Name</label>
               <Input required value={name} onChange={e => setName(e.target.value)} placeholder="e.g. AITS Mains Test 1" />
             </div>
-            <div className="space-y-2">
+            <div className="space-y-2 relative">
               <label className="text-sm font-medium">Date</label>
-              <Input required type="date" value={date} onChange={e => setDate(e.target.value)} />
+              <DatePicker required value={date} onChange={setDate} />
             </div>
             <div className="space-y-2 md:col-span-2">
               <label className="text-sm font-medium">Exam Type</label>
@@ -218,10 +229,6 @@ export default function ExamsPage() {
             </div>
           </div>
 
-          <div className="flex justify-end gap-3 pt-4 border-t border-border/50">
-            <Button type="button" variant="outline" onClick={() => { resetForm(); setIsModalOpen(false); }}>Cancel</Button>
-            <Button type="submit" disabled={!isDirty}>{editingExamId ? 'Update Exam' : 'Create Exam'}</Button>
-          </div>
         </form>
       </Modal>
 

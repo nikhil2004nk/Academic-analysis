@@ -13,8 +13,9 @@ export class AcademicController {
 
   @Get('subjects')
   @Roles(Role.SUPERADMIN, Role.STUDENT)
-  getSubjects() {
-    return this.academicService.findAllSubjects();
+  getSubjects(@Query('activeOnly') activeOnly?: string) {
+    const isActiveOnly = activeOnly === 'true';
+    return this.academicService.findAllSubjects(isActiveOnly);
   }
 
   @Post('subjects')
@@ -27,6 +28,12 @@ export class AcademicController {
   @Roles(Role.SUPERADMIN)
   updateSubject(@Param('id') id: string, @Body('name') name: string) {
     return this.academicService.updateSubject(id, name);
+  }
+
+  @Post('subjects/:id/toggle-active')
+  @Roles(Role.SUPERADMIN)
+  toggleSubjectActive(@Param('id') id: string) {
+    return this.academicService.toggleSubjectActive(id);
   }
 
   @Delete('subjects/:id')

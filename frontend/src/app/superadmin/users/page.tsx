@@ -160,8 +160,19 @@ export default function UserManagement() {
             isOpen={isModalOpen}
             onClose={() => setIsModalOpen(false)}
             title={editingUser ? "Edit User" : "Add New User"}
+            footer={
+              <div className="flex items-center justify-between w-full">
+                <p className="text-xs text-muted-foreground">Password defaults to Firstname@123</p>
+                <div className="space-x-3">
+                  <Button type="button" variant="ghost" onClick={() => setIsModalOpen(false)}>Cancel</Button>
+                  <Button type="submit" form="user-form" disabled={!isDirty} className="h-10 px-6">
+                    {editingUser ? 'Update' : <><Plus className="mr-2 h-4 w-4" /> Create</>}
+                  </Button>
+                </div>
+              </div>
+            }
           >
-            <form onSubmit={handleCreateUser} className="space-y-5 py-2">
+            <form id="user-form" onSubmit={handleCreateUser} className="space-y-5 py-2">
               <div className="space-y-2">
                 <label className="text-sm font-semibold text-white/90">Name</label>
                 <Input value={newUser.name} onChange={e => setNewUser({...newUser, name: e.target.value})} required />
@@ -182,15 +193,6 @@ export default function UserManagement() {
                 />
               </div>
               
-              <div className="pt-4 flex items-center justify-between border-t border-white/10">
-                <p className="text-xs text-muted-foreground">Password defaults to Firstname@123</p>
-                <div className="space-x-3">
-                  <Button type="button" variant="ghost" onClick={() => setIsModalOpen(false)}>Cancel</Button>
-                  <Button type="submit" disabled={!isDirty} className="h-10 px-6">
-                    {editingUser ? 'Update' : <><Plus className="mr-2 h-4 w-4" /> Create</>}
-                  </Button>
-                </div>
-              </div>
             </form>
           </Modal>
     </>

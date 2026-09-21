@@ -48,11 +48,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   const login = async (credentials: any) => {
     const { data } = await api.post('/auth/login', credentials);
     setUser(data);
-    if (data.role === 'superadmin') {
-      router.push('/superadmin/users');
-    } else {
-      router.push('/dashboard');
-    }
+    router.push('/dashboard');
   };
 
   const logout = async () => {
