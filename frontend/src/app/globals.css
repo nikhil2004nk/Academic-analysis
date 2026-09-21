@@ -1,0 +1,93 @@
+@import "tailwindcss";
+
+@theme {
+  --color-background: var(--background);
+  --color-foreground: var(--foreground);
+  --color-primary: var(--primary);
+  --color-primary-foreground: var(--primary-foreground);
+  --color-secondary: var(--secondary);
+  --color-secondary-foreground: var(--secondary-foreground);
+  --color-accent: var(--accent);
+  --color-accent-foreground: var(--accent-foreground);
+  --color-destructive: var(--destructive);
+  --color-destructive-foreground: var(--destructive-foreground);
+  --color-card: var(--card);
+  --color-card-foreground: var(--card-foreground);
+  --color-border: var(--border);
+  --color-input: var(--input);
+  --color-ring: var(--ring);
+  
+  --font-sans: var(--font-geist-sans);
+  --font-mono: var(--font-geist-mono);
+}
+
+:root {
+  /* Rich Black Background */
+  --background: #09090b;
+  --foreground: #fafafa;
+  
+  /* Primary Yellow */
+  --primary: #facc15;
+  --primary-foreground: #09090b;
+  
+  /* Secondary / Muted */
+  --secondary: #27272a;
+  --secondary-foreground: #fafafa;
+  
+  /* Accents */
+  --accent: #3f3f46;
+  --accent-foreground: #facc15;
+  
+  /* Destructive */
+  --destructive: #ef4444;
+  --destructive-foreground: #fafafa;
+  
+  /* Glassmorphic Cards */
+  --card: rgba(24, 24, 27, 0.6);
+  --card-foreground: #fafafa;
+  
+  /* Borders and Rings */
+  --border: #27272a;
+  --input: #18181b;
+  --ring: #facc15;
+}
+
+body {
+  background-color: var(--background);
+  color: var(--foreground);
+  font-family: var(--font-sans), Arial, Helvetica, sans-serif;
+  background-image: 
+    radial-gradient(at 0% 0%, rgba(250, 204, 21, 0.08) 0px, transparent 50%),
+    radial-gradient(at 100% 100%, rgba(250, 204, 21, 0.05) 0px, transparent 50%);
+  background-attachment: fixed;
+  min-height: 100vh;
+}
+
+/* Custom Glassmorphism Utilities */
+@layer utilities {
+  .glass {
+    @apply bg-card backdrop-blur-xl border border-white/10 shadow-[0_4px_30px_rgba(0,0,0,0.1)];
+  }
+  .glass-panel {
+    @apply bg-black/40 backdrop-blur-md border-r border-white/5;
+  }
+  .text-glow {
+    text-shadow: 0 0 10px rgba(250, 204, 21, 0.3);
+  }
+  .box-glow {
+    box-shadow: 0 0 15px rgba(250, 204, 21, 0.2);
+  }
+  .animate-hover {
+    @apply transition-all duration-300 ease-in-out hover:-translate-y-1 hover:shadow-lg active:scale-95;
+  }
+}
+
+/* Fix browser autofill styling for dark mode */
+input:-webkit-autofill,
+input:-webkit-autofill:hover, 
+input:-webkit-autofill:focus, 
+input:-webkit-autofill:active {
+    -webkit-box-shadow: 0 0 0 30px #18181b inset !important;
+    -webkit-text-fill-color: #fafafa !important;
+    transition: background-color 5000s ease-in-out 0s;
+}
