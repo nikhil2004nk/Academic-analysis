@@ -412,7 +412,9 @@ export class AcademicService {
     const results = await this.examResultRepository.find({
       where: { studentId },
       relations: {
-        exam: true,
+        exam: {
+          examSubjects: true,
+        },
         subjectMarks: {
           subject: true,
         }
