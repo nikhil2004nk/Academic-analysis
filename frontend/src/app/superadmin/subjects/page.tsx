@@ -80,7 +80,7 @@ export default function SubjectsPage() {
 
   return (
     <div className="space-y-8">
-      <div className="flex justify-between items-center mb-6">
+      <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4 mb-6">
         <div>
           <h2 className="text-3xl font-bold tracking-tight text-white mb-2">Subjects Management</h2>
           <p className="text-muted-foreground">Manage the subjects available for exams.</p>
@@ -89,7 +89,7 @@ export default function SubjectsPage() {
           setEditingId(null);
           setName('');
           setIsModalOpen(true);
-        }}>Add Subject</Button>
+        }} className="w-full sm:w-auto">Add Subject</Button>
       </div>
 
       <Modal isOpen={isModalOpen} onClose={() => setIsModalOpen(false)} title={editingId ? 'Edit Subject' : 'Add New Subject'}>
@@ -110,40 +110,44 @@ export default function SubjectsPage() {
         </form>
       </Modal>
 
-      <Card>
+      <Card className="bg-white/5 border-white/10">
         <CardHeader>
           <CardTitle>Existing Subjects</CardTitle>
         </CardHeader>
-        <CardContent>
-          <Table>
-            <TableHeader>
-              <TableRow>
-                <TableHead>Subject Name</TableHead>
-                <TableHead className="text-right">Actions</TableHead>
-              </TableRow>
-            </TableHeader>
-            <TableBody>
-              {subjects.length === 0 ? (
+        <CardContent className="p-0">
+          <div className="overflow-x-auto w-full">
+            <Table>
+              <TableHeader>
                 <TableRow>
-                  <TableCell colSpan={2} className="text-center py-8 text-muted-foreground">No subjects found.</TableCell>
+                  <TableHead className="w-[100px]">ID</TableHead>
+                  <TableHead>Subject Name</TableHead>
+                  <TableHead className="text-right">Actions</TableHead>
                 </TableRow>
-              ) : (
-                subjects.map((sub) => (
-                  <TableRow key={sub.id}>
-                    <TableCell className="font-medium">{sub.name}</TableCell>
-                    <TableCell className="text-right space-x-2">
-                      <Button variant="outline" size="sm" onClick={() => handleEdit(sub)}>
-                        Edit
-                      </Button>
-                      <Button variant="destructive" size="sm" onClick={() => handleDelete(sub.id)}>
-                        Delete
-                      </Button>
-                    </TableCell>
+              </TableHeader>
+              <TableBody>
+                {subjects.length === 0 ? (
+                  <TableRow>
+                    <TableCell colSpan={3} className="text-center py-8 text-muted-foreground">No subjects found.</TableCell>
                   </TableRow>
-                ))
-              )}
-            </TableBody>
-          </Table>
+                ) : (
+                  subjects.map((sub) => (
+                    <TableRow key={sub.id}>
+                      <TableCell className="font-mono text-xs">{sub.id}</TableCell>
+                      <TableCell className="font-medium">{sub.name}</TableCell>
+                      <TableCell className="text-right space-x-2">
+                        <Button variant="outline" size="sm" onClick={() => handleEdit(sub)}>
+                          Edit
+                        </Button>
+                        <Button variant="destructive" size="sm" onClick={() => handleDelete(sub.id)}>
+                          Delete
+                        </Button>
+                      </TableCell>
+                    </TableRow>
+                  ))
+                )}
+              </TableBody>
+            </Table>
+          </div>
         </CardContent>
       </Card>
     </div>

@@ -1,16 +1,17 @@
-import React from 'react';
+import React, { useState } from 'react';
 import { useAuth } from '@/context/AuthContext';
-import { LogOut } from 'lucide-react';
+import { LogOut, Menu } from 'lucide-react';
 import { Button } from '../ui/button';
 import { Sidebar } from './Sidebar';
 
 export function DashboardLayout({ children }: { children: React.ReactNode }) {
   const { logout } = useAuth();
+  const [isMobileOpen, setIsMobileOpen] = useState(false);
 
   return (
-    <div className="flex min-h-screen bg-background">
+    <div className="flex min-h-screen bg-background relative">
       {/* Sidebar */}
-      <Sidebar />
+      <Sidebar isMobileOpen={isMobileOpen} setIsMobileOpen={setIsMobileOpen} />
 
       {/* Main Content */}
       <main className="flex-1 flex flex-col min-w-0 overflow-hidden relative">
@@ -18,8 +19,13 @@ export function DashboardLayout({ children }: { children: React.ReactNode }) {
         <div className="absolute top-0 right-0 w-1/2 h-64 bg-primary/5 rounded-full blur-[100px] -z-10 pointer-events-none" />
         
         {/* Mobile Header */}
-        <header className="md:hidden flex items-center justify-between p-4 border-b border-white/5 glass sticky top-0 z-20">
-          <h1 className="text-xl font-bold text-primary">Academics</h1>
+        <header className="md:hidden flex items-center justify-between p-4 border-b border-white/5 glass sticky top-0 z-20 bg-background/95 backdrop-blur-md">
+          <div className="flex items-center gap-3">
+            <Button variant="ghost" size="icon" onClick={() => setIsMobileOpen(true)}>
+              <Menu className="w-6 h-6 text-white" />
+            </Button>
+            <h1 className="text-xl font-bold text-primary">Academics</h1>
+          </div>
           <Button variant="ghost" size="icon" onClick={logout}>
             <LogOut className="w-5 h-5 text-red-400" />
           </Button>

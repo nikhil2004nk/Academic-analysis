@@ -332,7 +332,7 @@ function StudentDashboard({ userId }: { userId: string }) {
           <CardTitle>Exam History</CardTitle>
         </CardHeader>
         <CardContent>
-          <div className="rounded-md border border-white/10 overflow-hidden">
+          <div className="rounded-md border border-white/10 overflow-x-auto w-full pb-2">
             <Table>
               <TableHeader className="bg-black/20">
                 <TableRow className="hover:bg-transparent border-white/10">

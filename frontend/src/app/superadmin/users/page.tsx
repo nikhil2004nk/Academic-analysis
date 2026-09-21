@@ -74,18 +74,18 @@ export default function UserManagement() {
 
   return (
     <>
-          <div className="flex justify-between items-center mb-6">
+          <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4 mb-6">
             <h1 className="text-3xl font-bold tracking-tight text-white text-glow">User Management</h1>
             <Button onClick={() => {
               setEditingUser(null);
               setNewUser({ name: "", email: "", role: "student" });
               setIsModalOpen(true);
-            }} className="h-10">
+            }} className="h-10 w-full sm:w-auto">
               <Plus className="mr-2 h-4 w-4" /> Add User
             </Button>
           </div>
           
-          <div className="rounded-2xl glass shadow-xl border border-white/5 overflow-hidden">
+          <div className="rounded-2xl glass shadow-xl border border-white/5 overflow-x-auto w-full">
             <Table>
               <TableHeader className="bg-white/5">
                 <TableRow>

@@ -479,16 +479,18 @@ export default function MarksEntryPage() {
         <p className="text-muted-foreground">Enter marks and attendance bidirectionally.</p>
       </div>
       
-      <div className="flex gap-4 border-b border-border/50 pb-4">
+      <div className="flex flex-wrap gap-4 border-b border-border/50 pb-4">
         <Button 
           variant={mode === 'by_exam' ? 'default' : 'outline'} 
           onClick={() => { setMode('by_exam'); setMarksData({}); setSelectedExamId(''); setSelectedStudentId(''); }}
+          className="flex-1 sm:flex-none"
         >
           By Exam
         </Button>
         <Button 
           variant={mode === 'by_student' ? 'default' : 'outline'} 
           onClick={() => { setMode('by_student'); setMarksData({}); setSelectedExamId(''); setSelectedStudentId(''); }}
+          className="flex-1 sm:flex-none"
         >
           By Student
         </Button>
@@ -516,12 +518,12 @@ export default function MarksEntryPage() {
 
           {selectedExamId && (
             <Card>
-              <CardHeader className="flex flex-row items-center justify-between">
+              <CardHeader className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4">
                 <CardTitle>Enter Marks: {exams.find(e => e.id === selectedExamId)?.name}</CardTitle>
-                <Button onClick={handleSaveMarks}>Save Marks</Button>
+                <Button onClick={handleSaveMarks} className="w-full sm:w-auto">Save Marks</Button>
               </CardHeader>
-              <CardContent>
-                <div className="overflow-x-auto">
+              <CardContent className="p-0 sm:p-6">
+                <div className="overflow-x-auto w-full pb-2">
                   <Table>
                     <TableHeader>
                       <TableRow>
@@ -573,7 +575,7 @@ export default function MarksEntryPage() {
                                         type="number"
                                         value={sData.totalObtainedMarks === undefined || sData.totalObtainedMarks === null ? '' : sData.totalObtainedMarks}
                                         onChange={(e) => handleTotalChange(student.id, 'totalObtainedMarks', e.target.value)}
-                                        className="w-20 border-2 border-yellow-500/50 hover:border-yellow-400 focus:border-yellow-400 bg-black/50 text-white font-bold rounded-md p-2 transition-colors outline-none"
+                                        className="w-16 sm:w-20 border-2 border-yellow-500/50 hover:border-yellow-400 focus:border-yellow-400 bg-black/50 text-white font-bold rounded-md p-2 transition-colors outline-none"
                                         placeholder="0"
                                       />
                                     </div>
@@ -583,7 +585,7 @@ export default function MarksEntryPage() {
                                         type="number"
                                         value={sData.totalMaxMarks === undefined || sData.totalMaxMarks === null ? '' : sData.totalMaxMarks}
                                         onChange={(e) => handleTotalChange(student.id, 'totalMaxMarks', e.target.value)}
-                                        className="w-20 border-2 border-yellow-500/50 hover:border-yellow-400 focus:border-yellow-400 bg-black/50 text-white font-bold rounded-md p-2 transition-colors outline-none"
+                                        className="w-16 sm:w-20 border-2 border-yellow-500/50 hover:border-yellow-400 focus:border-yellow-400 bg-black/50 text-white font-bold rounded-md p-2 transition-colors outline-none"
                                         placeholder="0"
                                       />
                                     </div>
@@ -652,15 +654,15 @@ export default function MarksEntryPage() {
 
           {selectedStudentId && (
             <Card>
-              <CardHeader className="flex flex-row items-center justify-between">
+              <CardHeader className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4">
                 <CardTitle>Enter Marks: {students.find(s => s.id === selectedStudentId)?.name}</CardTitle>
-                <div className="flex gap-2">
-                  <Button variant="ghost" className="text-muted-foreground hover:text-white" onClick={handleDownloadTemplate}>
+                <div className="flex flex-wrap gap-2 w-full sm:w-auto">
+                  <Button variant="ghost" className="text-muted-foreground hover:text-white flex-1 sm:flex-none" onClick={handleDownloadTemplate}>
                     Download Template
                   </Button>
-                  <Button variant="outline" onClick={handleExportMarks}>Export Excel</Button>
-                  <Button variant="outline" onClick={() => setIsUploadModalOpen(true)}>Import Excel</Button>
-                  <Button onClick={handleSaveMarks}>Save Marks</Button>
+                  <Button variant="outline" onClick={handleExportMarks} className="flex-1 sm:flex-none">Export</Button>
+                  <Button variant="outline" onClick={() => setIsUploadModalOpen(true)} className="flex-1 sm:flex-none">Import</Button>
+                  <Button onClick={handleSaveMarks} className="flex-1 sm:flex-none">Save Marks</Button>
                 </div>
               </CardHeader>
               <CardContent>

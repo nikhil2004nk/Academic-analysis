@@ -147,12 +147,12 @@ export default function ExamsPage() {
 
   return (
     <div className="space-y-8">
-      <div className="flex justify-between items-center mb-6">
+      <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4 mb-6">
         <div>
           <h2 className="text-3xl font-bold tracking-tight text-white mb-2">Exams Management</h2>
           <p className="text-muted-foreground">Create and manage JEE Mock Exams.</p>
         </div>
-        <Button onClick={() => { resetForm(); setIsModalOpen(true); }}>Add Exam</Button>
+        <Button onClick={() => { resetForm(); setIsModalOpen(true); }} className="w-full sm:w-auto">Add Exam</Button>
       </div>
 
       <Modal isOpen={isModalOpen} onClose={() => { resetForm(); setIsModalOpen(false); }} title={editingExamId ? "Edit Exam" : "Create New Exam"}>
@@ -218,18 +218,19 @@ export default function ExamsPage() {
         <CardHeader>
           <CardTitle>Existing Exams</CardTitle>
         </CardHeader>
-        <CardContent>
-          <Table>
-            <TableHeader>
-              <TableRow>
-                <TableHead>Date</TableHead>
-                <TableHead>Name</TableHead>
-                <TableHead>Type</TableHead>
-                <TableHead>Total Max Marks</TableHead>
-                <TableHead className="text-right">Actions</TableHead>
-              </TableRow>
-            </TableHeader>
-            <TableBody>
+        <CardContent className="p-0 sm:p-6">
+          <div className="overflow-x-auto w-full">
+            <Table>
+              <TableHeader>
+                <TableRow>
+                  <TableHead>Date</TableHead>
+                  <TableHead>Name</TableHead>
+                  <TableHead>Type</TableHead>
+                  <TableHead>Total Max Marks</TableHead>
+                  <TableHead className="text-right">Actions</TableHead>
+                </TableRow>
+              </TableHeader>
+              <TableBody>
               {exams.length === 0 ? (
                 <TableRow>
                   <TableCell colSpan={4} className="text-center py-8 text-muted-foreground">No exams created yet.</TableCell>
@@ -273,8 +274,9 @@ export default function ExamsPage() {
                   </TableRow>
                 ))
               )}
-            </TableBody>
-          </Table>
+              </TableBody>
+            </Table>
+          </div>
         </CardContent>
       </Card>
     </div>
