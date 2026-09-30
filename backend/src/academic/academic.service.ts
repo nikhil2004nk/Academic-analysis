@@ -223,6 +223,7 @@ export class AcademicService {
         marksMap[sm.subjectId] = sm.marksObtained;
       });
       return {
+        resultId: r.id,
         studentId: r.studentId,
         status: r.status,
         marks: marksMap,
@@ -246,6 +247,7 @@ export class AcademicService {
         marksMap[sm.subjectId] = sm.marksObtained;
       });
       return {
+        resultId: r.id,
         examId: r.examId,
         status: r.status,
         marks: marksMap,
@@ -431,9 +433,8 @@ export class AcademicService {
     };
   }
 
-  async getPendingApprovals() {
+  async getAllApprovals() {
     return this.examResultRepository.find({
-      where: { approvalStatus: 'PENDING' as any },
       relations: {
         exam: true,
         student: true,
@@ -449,13 +450,9 @@ export class AcademicService {
     
     await this.examResultRepository.delete(resultId);
     
-    // Also delete the parent exam if it was a custom exam to clean it up
-    if (result.examId) {
-      const exam = await this.examRepository.findOne({ where: { id: result.examId } });
-      if (exam && (exam.approvalStatus as any) !== 'APPROVED') {
-        await this.examRepository.delete(exam.id);
-      }
-    }
+    // We no longer delete the parent exam here because deleting an exam cascades
+    // and deletes marks for all users who took that exam.
+    // If the exam is orphaned, it just remains in the database.
     return { success: true };
   }
 

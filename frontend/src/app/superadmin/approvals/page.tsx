@@ -10,7 +10,7 @@ import { useToast } from '@/context/ToastContext';
 import { Modal } from '@/components/ui/modal';
 
 export default function ApprovalsPage() {
-  const [pendingResults, setPendingResults] = useState<any[]>([]);
+  const [allResults, setAllResults] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
   const { toast } = useToast();
   const [deletingId, setDeletingId] = useState<string | null>(null);
@@ -18,10 +18,10 @@ export default function ApprovalsPage() {
   const fetchApprovals = async () => {
     setLoading(true);
     try {
-      const res = await api.get('/academic/approvals/pending');
-      setPendingResults(res.data);
+      const res = await api.get('/academic/approvals/all');
+      setAllResults(res.data);
     } catch (error) {
-      toast('Failed to load pending approvals', 'error');
+      toast('Failed to load approvals', 'error');
     } finally {
       setLoading(false);
     }
@@ -31,11 +31,11 @@ export default function ApprovalsPage() {
     fetchApprovals();
   }, []);
 
-  const handleAction = async (resultId: string, status: 'APPROVED' | 'REJECTED') => {
+  const handleAction = async (resultId: string, status: 'APPROVED' | 'REJECTED' | 'PENDING') => {
     try {
       await api.post(`/academic/approvals/${resultId}`, { status });
       toast(`Exam result ${status.toLowerCase()} successfully`, 'success');
-      setPendingResults(prev => prev.filter(r => r.id !== resultId));
+      setAllResults(prev => prev.map(r => r.id === resultId ? { ...r, approvalStatus: status } : r));
     } catch (error) {
       toast('Failed to update approval status', 'error');
     }
@@ -46,7 +46,7 @@ export default function ApprovalsPage() {
     try {
       await api.delete(`/academic/approvals/${deletingId}`);
       toast('Request deleted successfully', 'success');
-      setPendingResults(prev => prev.filter(r => r.id !== deletingId));
+      setAllResults(prev => prev.filter(r => r.id !== deletingId));
     } catch (error) {
       toast('Failed to delete request', 'error');
     } finally {
@@ -58,9 +58,9 @@ export default function ApprovalsPage() {
     <div className="p-6 max-w-6xl mx-auto space-y-6">
       <div className="flex items-center justify-between">
         <div>
-          <h1 className="text-3xl font-bold tracking-tight">Pending Approvals</h1>
+          <h1 className="text-3xl font-bold tracking-tight">Exam Approvals</h1>
           <p className="text-muted-foreground mt-1">
-            Review and approve exam marks submitted by students.
+            Review and manage all exam marks submitted by students.
           </p>
         </div>
         <Button variant="outline" onClick={fetchApprovals}>Refresh List</Button>
@@ -76,30 +76,31 @@ export default function ApprovalsPage() {
                 <TableHead>Date</TableHead>
                 <TableHead>Type</TableHead>
                 <TableHead>Score</TableHead>
+                <TableHead>Status</TableHead>
                 <TableHead className="text-right">Actions</TableHead>
               </TableRow>
             </TableHeader>
             <TableBody>
               {loading ? (
                 <TableRow>
-                  <TableCell colSpan={6} className="text-center py-8 text-muted-foreground">
-                    Loading pending submissions...
+                  <TableCell colSpan={7} className="text-center py-8 text-muted-foreground">
+                    Loading submissions...
                   </TableCell>
                 </TableRow>
-              ) : pendingResults.length === 0 ? (
+              ) : allResults.length === 0 ? (
                 <TableRow>
-                  <TableCell colSpan={6} className="text-center py-12">
+                  <TableCell colSpan={7} className="text-center py-12">
                     <div className="flex flex-col items-center justify-center space-y-3">
                       <div className="w-12 h-12 rounded-full bg-primary/10 flex items-center justify-center">
                         <CheckCircle2 className="w-6 h-6 text-primary" />
                       </div>
-                      <p className="text-lg font-medium">All Caught Up!</p>
-                      <p className="text-sm text-muted-foreground">There are no pending exam submissions to review.</p>
+                      <p className="text-lg font-medium">No submissions yet!</p>
+                      <p className="text-sm text-muted-foreground">There are no exam submissions to review.</p>
                     </div>
                   </TableCell>
                 </TableRow>
               ) : (
-                pendingResults.map((result) => (
+                allResults.map((result) => (
                   <TableRow key={result.id} className="group hover:bg-muted/50 transition-colors">
                     <TableCell>
                       <div className="font-medium">{result.student?.name}</div>
@@ -121,23 +122,36 @@ export default function ApprovalsPage() {
                         </span>
                       </div>
                     </TableCell>
+                    <TableCell>
+                      <span className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium ${
+                        result.approvalStatus === 'APPROVED' ? 'bg-green-500/10 text-green-500 border border-green-500/20' :
+                        result.approvalStatus === 'REJECTED' ? 'bg-red-500/10 text-red-500 border border-red-500/20' :
+                        'bg-yellow-500/10 text-yellow-500 border border-yellow-500/20'
+                      }`}>
+                        {result.approvalStatus}
+                      </span>
+                    </TableCell>
                     <TableCell className="text-right">
                       <div className="flex justify-end gap-2">
-                        <Button 
-                          size="sm" 
-                          variant="outline" 
-                          className="border-red-500/30 text-red-500 hover:bg-red-500/10"
-                          onClick={() => handleAction(result.id, 'REJECTED')}
-                        >
-                          <XCircle className="w-4 h-4 mr-1" /> Reject
-                        </Button>
-                        <Button 
-                          size="sm"
-                          className="bg-green-500 hover:bg-green-600 text-white shadow-lg shadow-green-500/20"
-                          onClick={() => handleAction(result.id, 'APPROVED')}
-                        >
-                          <CheckCircle2 className="w-4 h-4 mr-1" /> Approve
-                        </Button>
+                        {result.approvalStatus !== 'REJECTED' && (
+                          <Button 
+                            size="sm" 
+                            variant="outline" 
+                            className="border-red-500/30 text-red-500 hover:bg-red-500/10"
+                            onClick={() => handleAction(result.id, 'REJECTED')}
+                          >
+                            <XCircle className="w-4 h-4 mr-1" /> Reject
+                          </Button>
+                        )}
+                        {result.approvalStatus !== 'APPROVED' && (
+                          <Button 
+                            size="sm"
+                            className="bg-green-500 hover:bg-green-600 text-white shadow-lg shadow-green-500/20"
+                            onClick={() => handleAction(result.id, 'APPROVED')}
+                          >
+                            <CheckCircle2 className="w-4 h-4 mr-1" /> Approve
+                          </Button>
+                        )}
                         <Button 
                           size="sm" 
                           variant="ghost" 

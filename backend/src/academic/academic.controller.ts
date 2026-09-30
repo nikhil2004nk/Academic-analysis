@@ -114,10 +114,10 @@ export class AcademicController {
     return this.academicService.importHistoricalMarks(studentId, payload);
   }
 
-  @Get('approvals/pending')
+  @Get('approvals/all')
   @Roles(Role.SUPERADMIN)
-  getPendingApprovals() {
-    return this.academicService.getPendingApprovals();
+  getAllApprovals() {
+    return this.academicService.getAllApprovals();
   }
 
   @Post('approvals/:id')

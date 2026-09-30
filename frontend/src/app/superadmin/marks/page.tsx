@@ -9,6 +9,8 @@ import api from '@/lib/api';
 import { format } from 'date-fns';
 import { useToast } from '@/context/ToastContext';
 import * as XLSX from 'xlsx';
+import { Trash2 } from 'lucide-react';
+import { Modal } from '@/components/ui/modal';
 
 interface Exam {
   id: string;
@@ -47,6 +49,7 @@ export default function MarksEntryPage() {
   const [importSummary, setImportSummary] = useState<any[] | null>(null);
   const [isUploadModalOpen, setIsUploadModalOpen] = useState(false);
   const [isDragging, setIsDragging] = useState(false);
+  const [deletingId, setDeletingId] = useState<string | null>(null);
 
   useEffect(() => {
     setIsDirty(JSON.stringify(marksData) !== initialMarksData);
@@ -81,6 +84,7 @@ export default function MarksEntryPage() {
         const existingMark = existing.find((m: any) => m.studentId === student.id);
         if (existingMark) {
           initialMarks[student.id] = { 
+            resultId: existingMark.resultId,
             status: existingMark.status, 
             marks: existingMark.marks || {},
             totalMaxMarks: existingMark.totalMaxMarks,
@@ -101,13 +105,14 @@ export default function MarksEntryPage() {
   const fetchExistingMarksByStudent = async (studentId: string) => {
     try {
       const res = await api.get(`/academic/students/${studentId}/marks`);
-      const existing = res.data; // Array of { examId, status, marks }
+      const existing = res.data; // Array of { examId, status, marks, resultId }
       
       const initialMarks: Record<string, any> = {};
       exams.forEach(exam => {
         const existingMark = existing.find((m: any) => m.examId === exam.id);
         if (existingMark) {
           initialMarks[exam.id] = { 
+            resultId: existingMark.resultId,
             status: existingMark.status, 
             marks: existingMark.marks || {},
             totalMaxMarks: existingMark.totalMaxMarks,
@@ -248,6 +253,22 @@ export default function MarksEntryPage() {
       toast('Failed to save marks', 'error');
     }
   };
+
+  const handleDeleteMarks = async (resultId: string) => {
+    try {
+      await api.delete(`/academic/approvals/${resultId}`);
+      toast('Marks deleted successfully', 'success');
+      if (mode === 'by_exam' && selectedExamId) {
+        fetchExistingMarksByExam(selectedExamId);
+      } else if (mode === 'by_student' && selectedStudentId) {
+        fetchExistingMarksByStudent(selectedStudentId);
+      }
+    } catch (error) {
+      console.error('Failed to delete marks', error);
+      toast('Failed to delete marks', 'error');
+    }
+  };
+
 
   const processFile = (file: File) => {
     setIsUploadModalOpen(false);
@@ -574,6 +595,17 @@ export default function MarksEntryPage() {
                                   { value: 'ABSENT', label: 'Absent' }
                                 ]}
                               />
+                              {sData.resultId && (
+                                <Button 
+                                  variant="ghost" 
+                                  size="sm" 
+                                  className="text-red-500 hover:text-red-600 hover:bg-red-500/10 ml-2 h-8 w-8 p-0 flex-shrink-0"
+                                  onClick={() => setDeletingId(sData.resultId)}
+                                  title="Delete Marks"
+                                >
+                                  <Trash2 className="w-4 h-4" />
+                                </Button>
+                              )}
                             </TableCell>
                             {exam?.examSubjects.length === 0 ? (
                               <TableCell colSpan={2} className="text-right">
@@ -687,7 +719,7 @@ export default function MarksEntryPage() {
                             <h4 className="font-semibold text-base">{exam.name}</h4>
                             <span className="text-xs px-2 py-0.5 rounded bg-white/10 text-muted-foreground">{format(new Date(exam.date), 'MMM dd, yyyy')}</span>
                           </div>
-                          <div className="w-28">
+                          <div className="w-28 flex items-center">
                             <Select
                               value={eData.status}
                               onChange={(value) => handleStatusChange(exam.id, value)}
@@ -697,6 +729,17 @@ export default function MarksEntryPage() {
                                 { value: 'ABSENT', label: 'Absent' }
                               ]}
                             />
+                            {eData.resultId && (
+                              <Button 
+                                variant="ghost" 
+                                size="sm" 
+                                className="text-red-500 hover:text-red-600 hover:bg-red-500/10 ml-2 h-8 w-8 p-0 flex-shrink-0"
+                                onClick={() => setDeletingId(eData.resultId)}
+                                title="Delete Marks"
+                              >
+                                <Trash2 className="w-4 h-4" />
+                              </Button>
+                            )}
                           </div>
                         </div>
                         {eData.status === 'PRESENT' && (
@@ -844,6 +887,29 @@ export default function MarksEntryPage() {
           </div>
         </div>
       )}
+
+      <Modal
+        isOpen={!!deletingId}
+        onClose={() => setDeletingId(null)}
+        title="Delete Marks"
+      >
+        <div className="space-y-4">
+          <p className="text-muted-foreground">
+            Are you sure you want to permanently delete these marks? This action cannot be undone.
+          </p>
+          <div className="flex justify-end gap-2">
+            <Button variant="outline" onClick={() => setDeletingId(null)}>Cancel</Button>
+            <Button variant="destructive" className="bg-red-500 hover:bg-red-600 text-white" onClick={() => {
+              if (deletingId) {
+                handleDeleteMarks(deletingId);
+                setDeletingId(null);
+              }
+            }}>
+              Delete
+            </Button>
+          </div>
+        </div>
+      </Modal>
     </div>
   );
 }
