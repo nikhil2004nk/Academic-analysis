@@ -8,6 +8,12 @@ export enum AttendanceStatus {
   ABSENT = 'ABSENT',
 }
 
+export enum ApprovalStatus {
+  PENDING = 'PENDING',
+  APPROVED = 'APPROVED',
+  REJECTED = 'REJECTED',
+}
+
 @Entity('exam_results')
 export class ExamResult {
   @PrimaryGeneratedColumn('uuid')
@@ -45,6 +51,13 @@ export class ExamResult {
 
   @OneToMany(() => SubjectMark, mark => mark.examResult, { cascade: true })
   subjectMarks: SubjectMark[];
+
+  @Column({
+    type: 'enum',
+    enum: ApprovalStatus,
+    default: ApprovalStatus.APPROVED, // Existing records and admin creations are approved by default
+  })
+  approvalStatus: ApprovalStatus;
 
   @CreateDateColumn()
   createdAt: Date;

@@ -416,10 +416,77 @@ export class AcademicService {
     };
   }
 
+  async getPendingApprovals() {
+    return this.examResultRepository.find({
+      where: { approvalStatus: 'PENDING' as any },
+      relations: {
+        exam: true,
+        student: true,
+        subjectMarks: { subject: true },
+      },
+      order: { createdAt: 'DESC' },
+    });
+  }
+
+  async approveOrRejectResult(resultId: string, status: 'APPROVED' | 'REJECTED') {
+    const result = await this.examResultRepository.findOne({ where: { id: resultId } });
+    if (!result) throw new NotFoundException('Exam result not found');
+    result.approvalStatus = status as any;
+    return this.examResultRepository.save(result);
+  }
+
+  async submitStudentExam(studentId: string, payload: any) {
+    // Student can submit an existing examId or details for a new mock exam
+    let examId = payload.examId;
+
+    if (!examId) {
+      // Create a custom exam for this student submission
+      let exam = new Exam();
+      exam.name = payload.examName || 'Custom Student Exam';
+      exam.date = new Date(payload.examDate || new Date());
+      exam.type = payload.examType || 'OTHER';
+      exam.examSubjects = [];
+
+      // Add subjects
+      if (payload.marks && typeof payload.marks === 'object') {
+        for (const [subjectId, mark] of Object.entries(payload.marks)) {
+          const exSub = new ExamSubject();
+          exSub.subjectId = subjectId;
+          exSub.maxMarks = 100; // default
+          exam.examSubjects.push(exSub);
+        }
+      }
+      
+      exam = await this.examRepository.save(exam);
+      examId = exam.id;
+    }
+
+    // Now save the marks as PENDING
+    const savePayload = [{
+      examId: examId,
+      status: AttendanceStatus.PRESENT,
+      marks: payload.marks || {},
+      totalMaxMarks: payload.totalMaxMarks || null,
+      totalObtainedMarks: payload.totalObtainedMarks || null,
+    }];
+
+    const results = await this.saveMarksByStudent(studentId, savePayload);
+    
+    // Set them to PENDING
+    for (const r of results) {
+      r.approvalStatus = 'PENDING' as any;
+      await this.examResultRepository.save(r);
+    }
+
+    return { message: 'Exam submitted for approval', results };
+  }
+
   async getStudentDashboard(studentId: string, startDate?: string, endDate?: string) {
-    // Fetch all results to calculate global trends (like MoM) accurately regardless of filters
     const allResults = await this.examResultRepository.find({
-      where: { studentId },
+      where: { 
+        studentId,
+        approvalStatus: 'APPROVED' as any,
+      },
       relations: {
         exam: {
           examSubjects: true,

@@ -102,6 +102,27 @@ export class AcademicController {
     return this.academicService.importHistoricalMarks(studentId, payload);
   }
 
+  @Get('approvals/pending')
+  @Roles(Role.SUPERADMIN)
+  getPendingApprovals() {
+    return this.academicService.getPendingApprovals();
+  }
+
+  @Post('approvals/:id')
+  @Roles(Role.SUPERADMIN)
+  approveOrRejectResult(@Param('id') id: string, @Body('status') status: 'APPROVED' | 'REJECTED') {
+    return this.academicService.approveOrRejectResult(id, status);
+  }
+
+  @Post('students/:id/submit-exam')
+  @Roles(Role.STUDENT, Role.SUPERADMIN)
+  submitStudentExam(@Param('id') studentId: string, @Body() payload: any, @Request() req: any) {
+    if (req.user.role === Role.STUDENT && req.user.id !== studentId) {
+      studentId = req.user.id; // Enforce they can only submit for themselves
+    }
+    return this.academicService.submitStudentExam(studentId, payload);
+  }
+
   @Get('dashboard/student/:id')
   @Roles(Role.SUPERADMIN, Role.STUDENT)
   getDashboardData(
