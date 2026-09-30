@@ -85,8 +85,11 @@ export class AcademicController {
   }
 
   @Get('students/:id/marks')
-  @Roles(Role.SUPERADMIN)
-  getMarksByStudent(@Param('id') studentId: string) {
+  @Roles(Role.SUPERADMIN, Role.STUDENT)
+  getMarksByStudent(@Param('id') studentId: string, @Request() req: any) {
+    if (req.user.role === Role.STUDENT && req.user.id !== studentId) {
+      studentId = req.user.id;
+    }
     return this.academicService.getMarksByStudent(studentId);
   }
 

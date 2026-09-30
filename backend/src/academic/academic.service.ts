@@ -210,7 +210,10 @@ export class AcademicService {
 
   async getMarksByExam(examId: string) {
     const results = await this.examResultRepository.find({
-      where: { examId },
+      where: { 
+        examId,
+        approvalStatus: 'APPROVED' as any,
+      },
       relations: { subjectMarks: true },
     });
     return results.map(r => {
@@ -230,7 +233,10 @@ export class AcademicService {
 
   async getMarksByStudent(studentId: string) {
     const results = await this.examResultRepository.find({
-      where: { studentId },
+      where: { 
+        studentId,
+        approvalStatus: 'APPROVED' as any,
+      },
       relations: { subjectMarks: true },
     });
     return results.map(r => {

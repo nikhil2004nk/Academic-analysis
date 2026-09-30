@@ -40,7 +40,8 @@ export function Select({ options, value, onChange, placeholder = "Select an opti
   }, []);
 
   useEffect(() => {
-    const handleScroll = () => {
+    const handleScroll = (e: Event) => {
+      if ((e.target as Element)?.closest?.('.select-dropdown-portal')) return;
       if (isOpen) setIsOpen(false); // Close on scroll to prevent floating menu
     };
     window.addEventListener('scroll', handleScroll, true);
