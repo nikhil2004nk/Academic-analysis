@@ -1,0 +1,32 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512">
+  <!-- Background -->
+  <rect width="512" height="512" rx="128" fill="url(#bg-gradient)" />
+  
+  <!-- Outer Glow / Ring -->
+  <circle cx="256" cy="256" r="160" fill="none" stroke="url(#ring-gradient)" stroke-width="16" stroke-dasharray="20 10" opacity="0.8" />
+  
+  <!-- Academic Hat -->
+  <path d="M128 220 L256 150 L384 220 L256 290 Z" fill="#ffffff" />
+  <path d="M256 290 L256 370 C256 390, 192 390, 192 370 L192 325" fill="none" stroke="#ffffff" stroke-width="16" stroke-linecap="round" stroke-linejoin="round" />
+  
+  <!-- Analytics Bars inside the hat's bounds or behind it? Let's put a chart in front -->
+  <!-- Bar 1 -->
+  <rect x="200" y="270" width="24" height="60" rx="6" fill="#3b82f6" />
+  <!-- Bar 2 -->
+  <rect x="244" y="230" width="24" height="100" rx="6" fill="#eab308" />
+  <!-- Bar 3 -->
+  <rect x="288" y="200" width="24" height="130" rx="6" fill="#22c55e" />
+  
+  <!-- Definitions -->
+  <defs>
+    <linearGradient id="bg-gradient" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" stop-color="#0f172a" />
+      <stop offset="100%" stop-color="#1e1b4b" />
+    </linearGradient>
+    <linearGradient id="ring-gradient" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" stop-color="#3b82f6" />
+      <stop offset="50%" stop-color="#a855f7" />
+      <stop offset="100%" stop-color="#ec4899" />
+    </linearGradient>
+  </defs>
+</svg>
