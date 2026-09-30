@@ -6,6 +6,7 @@ import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/com
 import { Input } from '@/components/ui/input';
 import { Button } from '@/components/ui/button';
 import { useAuth } from '@/context/AuthContext';
+import { Select } from '@/components/ui/select';
 
 export default function SubmitExamPage() {
   const { user } = useAuth();
@@ -167,12 +168,14 @@ export default function SubmitExamPage() {
           {/* TABS */}
           <div className="flex gap-4 mb-6 border-b border-border/50 pb-2">
             <button 
+              type="button"
               className={`font-semibold pb-2 transition-all ${activeTab === 'existing' ? 'text-primary border-b-2 border-primary' : 'text-muted-foreground hover:text-foreground'}`}
               onClick={() => handleTabChange('existing')}
             >
               Select Existing Exam
             </button>
             <button 
+              type="button"
               className={`font-semibold pb-2 transition-all ${activeTab === 'custom' ? 'text-primary border-b-2 border-primary' : 'text-muted-foreground hover:text-foreground'}`}
               onClick={() => handleTabChange('custom')}
             >
@@ -190,17 +193,15 @@ export default function SubmitExamPage() {
                     You have already submitted marks for all available exams! 🎉
                   </div>
                 ) : (
-                  <select 
-                    className="flex h-11 w-full rounded-lg border border-border/50 bg-input/50 px-3 py-2 text-sm transition-all focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-primary"
+                  <Select 
+                    options={availableExams.map(exam => ({
+                      label: `${exam.name} (${new Date(exam.date).toLocaleDateString()})`,
+                      value: exam.id
+                    }))}
                     value={selectedExamId}
-                    onChange={e => handleExamSelect(e.target.value)}
-                    required
-                  >
-                    <option value="" disabled>-- Select Exam --</option>
-                    {availableExams.map(exam => (
-                      <option key={exam.id} value={exam.id}>{exam.name} ({new Date(exam.date).toLocaleDateString()})</option>
-                    ))}
-                  </select>
+                    onChange={(value: string) => handleExamSelect(value)}
+                    placeholder="-- Select Exam --"
+                  />
                 )}
               </div>
             )}
@@ -230,16 +231,17 @@ export default function SubmitExamPage() {
                   </div>
                   <div className="space-y-2">
                     <label className="text-sm font-medium">Exam Type</label>
-                    <select 
-                      className="flex h-11 w-full rounded-lg border border-border/50 bg-input/50 px-3 py-2 text-sm transition-all focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-primary disabled:opacity-50"
-                      disabled={activeTab === 'existing'}
-                      value={formData.examType}
-                      onChange={e => setFormData({...formData, examType: e.target.value})}
-                    >
-                      <option value="MAINS">JEE Mains</option>
-                      <option value="ADVANCED">JEE Advanced</option>
-                      <option value="OTHER">Other / Custom</option>
-                    </select>
+                    <div className={activeTab === 'existing' ? 'opacity-50 pointer-events-none' : ''}>
+                      <Select 
+                        options={[
+                          { label: 'JEE Mains', value: 'MAINS' },
+                          { label: 'JEE Advanced', value: 'ADVANCED' },
+                          { label: 'Other / Custom', value: 'OTHER' }
+                        ]}
+                        value={formData.examType}
+                        onChange={(value: string) => setFormData({...formData, examType: value})}
+                      />
+                    </div>
                   </div>
                   <div className="space-y-2">
                     <label className="text-sm font-medium">Total Maximum Marks</label>
