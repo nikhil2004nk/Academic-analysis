@@ -5,6 +5,16 @@ const api = axios.create({
   withCredentials: true,
 });
 
+api.interceptors.request.use((config) => {
+  if (typeof window !== 'undefined') {
+    const token = localStorage.getItem('accessToken');
+    if (token) {
+      config.headers.Authorization = `Bearer ${token}`;
+    }
+  }
+  return config;
+});
+
 api.interceptors.response.use(
   (response) => response,
   async (error) => {
@@ -17,12 +27,25 @@ api.interceptors.response.use(
 
       originalRequest._retry = true;
       try {
-        await api.post('/auth/refresh');
+        const refreshToken = typeof window !== 'undefined' ? localStorage.getItem('refreshToken') : null;
+        const res = await api.post('/auth/refresh', {}, {
+          headers: {
+            'x-refresh-token': refreshToken || ''
+          }
+        });
+        
+        if (typeof window !== 'undefined' && res.data.accessToken) {
+          localStorage.setItem('accessToken', res.data.accessToken);
+          localStorage.setItem('refreshToken', res.data.refreshToken);
+        }
+        
         return api(originalRequest);
       } catch (refreshError) {
         // If refresh fails, it means we are truly logged out.
         // We can redirect to login here or handle it in the context
         if (typeof window !== 'undefined' && window.location.pathname !== '/login') {
+          localStorage.removeItem('accessToken');
+          localStorage.removeItem('refreshToken');
           window.location.href = '/login';
         }
         return Promise.reject(refreshError);

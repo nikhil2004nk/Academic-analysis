@@ -30,12 +30,12 @@ export class AuthController {
       maxAge: 7 * 24 * 60 * 60 * 1000, // 7 days
     });
 
-    return user;
+    return { ...user, accessToken, refreshToken };
   }
 
   @Post('refresh')
   async refresh(@Req() req: Request, @Res({ passthrough: true }) res: Response) {
-    const refreshToken = req.cookies?.Refresh;
+    const refreshToken = req.cookies?.Refresh || req.headers['x-refresh-token'];
     if (!refreshToken) {
       throw new UnauthorizedException('Refresh token not found');
     }
@@ -63,7 +63,7 @@ export class AuthController {
       maxAge: 7 * 24 * 60 * 60 * 1000, // 7 days
     });
 
-    return { message: 'Tokens refreshed successfully' };
+    return { message: 'Tokens refreshed successfully', accessToken: newAccessToken, refreshToken: newRefreshToken };
   }
 
   @UseGuards(JwtAuthGuard)

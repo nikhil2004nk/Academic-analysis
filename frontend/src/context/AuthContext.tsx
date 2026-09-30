@@ -47,6 +47,10 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
 
   const login = async (credentials: any) => {
     const { data } = await api.post('/auth/login', credentials);
+    if (data.accessToken) {
+      localStorage.setItem('accessToken', data.accessToken);
+      localStorage.setItem('refreshToken', data.refreshToken);
+    }
     setUser(data);
     router.push('/dashboard');
   };
@@ -55,6 +59,8 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     try {
       await api.post('/auth/logout');
     } finally {
+      localStorage.removeItem('accessToken');
+      localStorage.removeItem('refreshToken');
       setUser(null);
       router.push('/login');
     }
