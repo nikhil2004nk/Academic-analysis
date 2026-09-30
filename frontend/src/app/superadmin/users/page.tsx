@@ -65,16 +65,19 @@ export default function UserManagement() {
     }
   };
 
-  const handleDelete = async (id: string) => {
-    if (confirm("Are you sure you want to delete this user?")) {
-      try {
-        await userService.deleteUser(id);
-        toast('User deleted successfully', 'success');
-        fetchUsers();
-      } catch (err) {
-        console.error(err);
-        toast('Failed to delete user', 'error');
-      }
+  const [deletingUserId, setDeletingUserId] = useState<string | null>(null);
+
+  const confirmDeleteUser = async () => {
+    if (!deletingUserId) return;
+    try {
+      await userService.deleteUser(deletingUserId);
+      toast('User deleted successfully', 'success');
+      fetchUsers();
+    } catch (err) {
+      console.error(err);
+      toast('Failed to delete user', 'error');
+    } finally {
+      setDeletingUserId(null);
     }
   };
 
@@ -146,7 +149,7 @@ export default function UserManagement() {
                       }} className="hover:bg-primary/20 hover:text-primary">
                         <Edit2 className="h-4 w-4" />
                       </Button>
-                      <Button variant="ghost" size="icon" onClick={() => handleDelete(u.id)} disabled={u.id === user?.id} className="hover:bg-destructive/20 hover:text-destructive">
+                      <Button variant="ghost" size="icon" onClick={() => setDeletingUserId(u.id)} disabled={u.id === user?.id} className="hover:bg-destructive/20 hover:text-destructive">
                         <Trash2 className="h-4 w-4" />
                       </Button>
                     </TableCell>
@@ -155,6 +158,22 @@ export default function UserManagement() {
               </TableBody>
             </Table>
           </div>
+
+          <Modal
+            isOpen={!!deletingUserId}
+            onClose={() => setDeletingUserId(null)}
+            title="Delete User"
+          >
+            <div className="space-y-4">
+              <p className="text-muted-foreground">
+                Are you sure you want to delete this user? This action cannot be undone.
+              </p>
+              <div className="flex justify-end gap-2 mt-6">
+                <Button variant="outline" onClick={() => setDeletingUserId(null)}>Cancel</Button>
+                <Button variant="destructive" onClick={confirmDeleteUser}>Delete</Button>
+              </div>
+            </div>
+          </Modal>
 
           <Modal
             isOpen={isModalOpen}

@@ -8,18 +8,20 @@ import { Button } from '@/components/ui/button';
 import { useAuth } from '@/context/AuthContext';
 import { Select } from '@/components/ui/select';
 import { DatePicker } from '@/components/ui/date-picker';
+import { useToast } from '@/context/ToastContext';
 
 export default function SubmitExamPage() {
   const { user } = useAuth();
+  const { toast } = useToast();
   const [subjects, setSubjects] = useState<any[]>([]);
   const [existingExams, setExistingExams] = useState<any[]>([]);
   const [takenExamIds, setTakenExamIds] = useState<Set<string>>(new Set());
-  
+
   const [activeTab, setActiveTab] = useState<'existing' | 'custom' | 'submissions'>('existing');
   const [selectedExamId, setSelectedExamId] = useState<string>('');
-  
+
   const [isAbsent, setIsAbsent] = useState(false);
-  
+
   const [formData, setFormData] = useState({
     examName: '',
     examDate: new Date().toISOString().split('T')[0],
@@ -32,17 +34,17 @@ export default function SubmitExamPage() {
 
   useEffect(() => {
     if (!user) return;
-    
+
     // Fetch subjects
     api.get('/academic/subjects?activeOnly=true')
       .then(res => setSubjects(res.data))
-      .catch(err => alert('Failed to load subjects'));
+      .catch(err => toast('Failed to load subjects', 'error'));
 
     // Fetch existing exams
     api.get('/academic/exams')
       .then(res => setExistingExams(res.data))
       .catch(err => console.error('Failed to load existing exams'));
-      
+
     // Fetch user's taken exams (to filter out)
     api.get(`/academic/students/${user.id}/submissions`)
       .then(res => {
@@ -99,13 +101,13 @@ export default function SubmitExamPage() {
     // Fill form with the previous data
     const isCustom = sub.exam?.approvalStatus === 'REJECTED' || sub.exam?.approvalStatus === 'PENDING';
     setActiveTab(isCustom ? 'custom' : 'existing');
-    
+
     if (!isCustom) {
       setSelectedExamId(sub.examId);
     } else {
       setSelectedExamId('');
     }
-    
+
     setIsAbsent(sub.status === 'ABSENT');
     setFormData({
       examName: sub.exam?.name || '',
@@ -133,12 +135,12 @@ export default function SubmitExamPage() {
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!user) return alert('Not logged in');
-    
+    if (!user) return toast('Not logged in', 'error');
+
     if (activeTab === 'existing' && !selectedExamId) {
-      return alert('Please select an exam first');
+      return toast('Please select an exam first', 'error');
     }
-    
+
     setLoading(true);
     try {
       const payload: any = {
@@ -146,19 +148,19 @@ export default function SubmitExamPage() {
         status: isAbsent ? 'ABSENT' : 'PRESENT',
         totalObtainedMarks: calculateObtained()
       };
-      
+
       if (activeTab === 'existing') {
         payload.examId = selectedExamId;
       }
-      
+
       await api.post(`/academic/students/${user.id}/submit-exam`, payload);
-      alert('Exam submitted successfully! Waiting for admin approval.');
-      
+      toast('Exam submitted successfully! Waiting for admin approval.', 'success');
+
       // Update local taken state
       if (activeTab === 'existing') {
         setTakenExamIds(prev => new Set([...prev, selectedExamId]));
       }
-      
+
       setFormData({
         examName: '',
         examDate: new Date().toISOString().split('T')[0],
@@ -169,53 +171,57 @@ export default function SubmitExamPage() {
       setSelectedExamId('');
       setIsAbsent(false);
     } catch (error) {
-      alert('Failed to submit exam');
+      toast('Failed to submit exam', 'error');
       console.error(error);
     } finally {
       setLoading(false);
     }
   };
 
-  const displayedSubjects = activeTab === 'custom' 
-    ? subjects 
+  const displayedSubjects = activeTab === 'custom'
+    ? subjects
     : subjects.filter(s => existingExams.find(e => e.id === selectedExamId)?.examSubjects?.some((es: any) => es.subjectId === s.id));
 
   return (
     <div className="p-4 md:p-6 max-w-5xl mx-auto space-y-6">
-      <Card className="border-border/50 bg-card/50 backdrop-blur-sm shadow-xl">
-        <CardHeader>
-          <CardTitle className="text-2xl font-bold bg-gradient-to-r from-primary to-primary/60 bg-clip-text text-transparent">
-            Submit Exam Marks
-          </CardTitle>
-          <CardDescription>
-            Submit your marks for a school exam or log a custom practice test.
-          </CardDescription>
-        </CardHeader>
-        <CardContent>
-          {/* TABS */}
-          <div className="flex gap-4 mb-6 border-b border-border/50 pb-2 overflow-x-auto">
-            <button 
-              type="button"
-              className={`font-semibold pb-2 transition-all whitespace-nowrap ${activeTab === 'existing' ? 'text-primary border-b-2 border-primary' : 'text-muted-foreground hover:text-foreground'}`}
-              onClick={() => handleTabChange('existing')}
-            >
-              Select Existing Exam
-            </button>
-            <button 
-              type="button"
-              className={`font-semibold pb-2 transition-all whitespace-nowrap ${activeTab === 'custom' ? 'text-primary border-b-2 border-primary' : 'text-muted-foreground hover:text-foreground'}`}
-              onClick={() => handleTabChange('custom')}
-            >
-              Create Custom Exam
-            </button>
-            <button 
-              type="button"
-              className={`font-semibold pb-2 transition-all whitespace-nowrap ${activeTab === 'submissions' ? 'text-primary border-b-2 border-primary' : 'text-muted-foreground hover:text-foreground'}`}
-              onClick={() => handleTabChange('submissions')}
-            >
-              My Submissions
-            </button>
-          </div>
+      <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
+        <div>
+          <h1 className="text-3xl font-bold tracking-tight text-foreground">Submit Exam Marks</h1>
+          <p className="text-muted-foreground mt-1">
+            Submit your marks, log a custom practice test, or view your past submissions.
+          </p>
+        </div>
+      </div>
+
+      <div className="flex flex-wrap gap-4 border-b border-border/50 pb-4">
+        <Button
+          type="button"
+          variant={activeTab === 'existing' ? 'default' : 'outline'}
+          onClick={() => handleTabChange('existing')}
+          className="flex-1 sm:flex-none"
+        >
+          Select Official Exam
+        </Button>
+        <Button
+          type="button"
+          variant={activeTab === 'custom' ? 'default' : 'outline'}
+          onClick={() => handleTabChange('custom')}
+          className="flex-1 sm:flex-none"
+        >
+          Create Custom Exam
+        </Button>
+        <Button
+          type="button"
+          variant={activeTab === 'submissions' ? 'default' : 'outline'}
+          onClick={() => handleTabChange('submissions')}
+          className="flex-1 sm:flex-none"
+        >
+          My Submissions
+        </Button>
+      </div>
+
+      <Card className="border-border/50 bg-card/50 backdrop-blur-sm shadow-xl mt-6">
+        <CardContent className="p-6">
 
           {activeTab === 'submissions' ? (
             <div className="space-y-4">
@@ -253,18 +259,18 @@ export default function SubmitExamPage() {
                           </td>
                           <td className="px-4 py-3">
                             <span className={`inline-flex items-center px-2 py-1 rounded-full text-xs font-semibold
-                              ${sub.approvalStatus === 'APPROVED' ? 'bg-green-500/10 text-green-500' : 
-                                sub.approvalStatus === 'REJECTED' ? 'bg-red-500/10 text-red-500' : 
-                                'bg-yellow-500/10 text-yellow-600 dark:text-yellow-400'}`}
+                              ${sub.approvalStatus === 'APPROVED' ? 'bg-green-500/10 text-green-500' :
+                                sub.approvalStatus === 'REJECTED' ? 'bg-red-500/10 text-red-500' :
+                                  'bg-yellow-500/10 text-yellow-600 dark:text-yellow-400'}`}
                             >
                               {sub.approvalStatus}
                             </span>
                           </td>
                           <td className="px-4 py-3 text-right">
                             {sub.approvalStatus === 'REJECTED' && (
-                              <Button 
-                                size="sm" 
-                                variant="outline" 
+                              <Button
+                                size="sm"
+                                variant="outline"
                                 className="text-xs h-8"
                                 onClick={() => handleResubmit(sub)}
                               >
@@ -281,129 +287,129 @@ export default function SubmitExamPage() {
             </div>
           ) : (
             <form onSubmit={handleSubmit} className="space-y-6">
-            
-            {activeTab === 'existing' && (
-              <div className="space-y-2 mb-6">
-                <label className="text-sm font-medium">Select Official Exam</label>
-                {availableExams.length === 0 ? (
-                  <div className="p-4 bg-primary/10 text-primary rounded-lg text-sm font-medium">
-                    You have already submitted marks for all available exams! 🎉
-                  </div>
-                ) : (
-                  <Select 
-                    options={availableExams.map(exam => ({
-                      label: `${exam.name} (${new Date(exam.date).toLocaleDateString()})`,
-                      value: exam.id
-                    }))}
-                    value={selectedExamId}
-                    onChange={(value: string) => handleExamSelect(value)}
-                    placeholder="-- Select Exam --"
-                  />
-                )}
-              </div>
-            )}
 
-            {(activeTab === 'custom' || (activeTab === 'existing' && selectedExamId)) && (
-              <>
-                <div className="grid grid-cols-1 md:grid-cols-2 gap-4 opacity-70">
-                  <div className="space-y-2">
-                    <label className="text-sm font-medium">Exam Name</label>
-                    <Input 
-                      required 
-                      disabled={activeTab === 'existing'}
-                      placeholder="e.g. Mock Test 1"
-                      value={formData.examName}
-                      onChange={e => setFormData({...formData, examName: e.target.value})}
-                    />
-                  </div>
-                  <div className="space-y-2">
-                    <label className="text-sm font-medium">Date</label>
-                    <div className={activeTab === 'existing' ? 'opacity-50 pointer-events-none' : ''}>
-                      <DatePicker 
-                        required 
-                        value={formData.examDate}
-                        onChange={(value: string) => setFormData({...formData, examDate: value})}
-                      />
+              {activeTab === 'existing' && (
+                <div className="space-y-2 mb-6">
+                  <label className="text-sm font-medium">Select Official Exam</label>
+                  {availableExams.length === 0 ? (
+                    <div className="p-4 bg-primary/10 text-primary rounded-lg text-sm font-medium">
+                      You have already submitted marks for all available exams! 🎉
                     </div>
-                  </div>
-                  <div className="space-y-2">
-                    <label className="text-sm font-medium">Exam Type</label>
-                    <div className={activeTab === 'existing' ? 'opacity-50 pointer-events-none' : ''}>
-                      <Select 
-                        options={[
-                          { label: 'JEE Mains', value: 'MAINS' },
-                          { label: 'JEE Advanced', value: 'ADVANCED' },
-                          { label: 'Other / Custom', value: 'OTHER' }
-                        ]}
-                        value={formData.examType}
-                        onChange={(value: string) => setFormData({...formData, examType: value})}
-                      />
-                    </div>
-                  </div>
-                  <div className="space-y-2">
-                    <label className="text-sm font-medium">Total Maximum Marks</label>
-                    <Input 
-                      type="number" 
-                      required 
-                      min="1"
-                      disabled={activeTab === 'existing'}
-                      value={formData.totalMaxMarks}
-                      onChange={e => setFormData({...formData, totalMaxMarks: Number(e.target.value)})}
+                  ) : (
+                    <Select
+                      options={availableExams.map(exam => ({
+                        label: `${exam.name} (${new Date(exam.date).toLocaleDateString()})`,
+                        value: exam.id
+                      }))}
+                      value={selectedExamId}
+                      onChange={(value: string) => handleExamSelect(value)}
+                      placeholder="-- Select Exam --"
                     />
-                  </div>
+                  )}
                 </div>
+              )}
 
-                <div className="border-t border-border/50 pt-4 mt-6">
-                  <div className="flex items-center justify-between mb-4">
-                    <h3 className="text-lg font-semibold">Subject Marks</h3>
-                    <label className="flex items-center space-x-2 bg-red-500/10 px-3 py-1.5 rounded-lg border border-red-500/20 cursor-pointer hover:bg-red-500/20 transition-all">
-                      <input 
-                        type="checkbox" 
-                        className="rounded border-red-500 text-red-500 focus:ring-red-500 w-4 h-4 cursor-pointer"
-                        checked={isAbsent}
-                        onChange={(e) => setIsAbsent(e.target.checked)}
+              {(activeTab === 'custom' || (activeTab === 'existing' && selectedExamId)) && (
+                <>
+                  <div className="grid grid-cols-1 md:grid-cols-2 gap-4 opacity-70">
+                    <div className="space-y-2">
+                      <label className="text-sm font-medium">Exam Name</label>
+                      <Input
+                        required
+                        disabled={activeTab === 'existing'}
+                        placeholder="e.g. Mock Test 1"
+                        value={formData.examName}
+                        onChange={e => setFormData({ ...formData, examName: e.target.value })}
                       />
-                      <span className="text-sm font-medium text-red-500">I was absent for this exam</span>
-                    </label>
-                  </div>
-
-                  {!isAbsent && (
-                    displayedSubjects.length === 0 ? (
-                      <p className="text-sm text-muted-foreground">No subjects found for this exam.</p>
-                    ) : (
-                      <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-                        {displayedSubjects.map(subject => (
-                          <div key={subject.id} className="space-y-2 bg-background/50 p-3 rounded-lg border border-border/30">
-                            <label className="text-sm font-medium text-foreground/80">{subject.name}</label>
-                            <Input 
-                              type="number" 
-                              placeholder="0"
-                              value={formData.marks[subject.id] || ''}
-                              onChange={e => handleMarkChange(subject.id, e.target.value)}
-                            />
-                          </div>
-                        ))}
+                    </div>
+                    <div className="space-y-2">
+                      <label className="text-sm font-medium">Date</label>
+                      <div className={activeTab === 'existing' ? 'opacity-50 pointer-events-none' : ''}>
+                        <DatePicker
+                          required
+                          value={formData.examDate}
+                          onChange={(value: string) => setFormData({ ...formData, examDate: value })}
+                        />
                       </div>
-                    )
-                  )}
-                  {isAbsent && (
-                    <div className="p-4 text-center border border-dashed border-red-500/30 bg-red-500/5 rounded-lg">
-                      <p className="text-red-500/80 text-sm">You are marking yourself as Absent. No marks will be recorded.</p>
                     </div>
-                  )}
-                </div>
-
-                <div className="flex justify-between items-center border-t border-border/50 pt-4 mt-6">
-                  <div className="text-sm text-muted-foreground">
-                    Total Obtained: <span className="font-bold text-foreground">{calculateObtained()}</span> / {formData.totalMaxMarks}
+                    <div className="space-y-2">
+                      <label className="text-sm font-medium">Exam Type</label>
+                      <div className={activeTab === 'existing' ? 'opacity-50 pointer-events-none' : ''}>
+                        <Select
+                          options={[
+                            { label: 'JEE Mains', value: 'MAINS' },
+                            { label: 'JEE Advanced', value: 'ADVANCED' },
+                            { label: 'Other / Custom', value: 'OTHER' }
+                          ]}
+                          value={formData.examType}
+                          onChange={(value: string) => setFormData({ ...formData, examType: value })}
+                        />
+                      </div>
+                    </div>
+                    <div className="space-y-2">
+                      <label className="text-sm font-medium">Total Maximum Marks</label>
+                      <Input
+                        type="number"
+                        required
+                        min="1"
+                        disabled={activeTab === 'existing'}
+                        value={formData.totalMaxMarks}
+                        onChange={e => setFormData({ ...formData, totalMaxMarks: Number(e.target.value) })}
+                      />
+                    </div>
                   </div>
-                  <Button type="submit" disabled={loading} className="bg-primary text-primary-foreground shadow-lg hover:shadow-primary/25 transition-all">
-                    {loading ? 'Submitting...' : 'Submit for Approval'}
-                  </Button>
-                </div>
-              </>
-            )}
-          </form>
+
+                  <div className="border-t border-border/50 pt-4 mt-6">
+                    <div className="flex items-center justify-between mb-4">
+                      <h3 className="text-lg font-semibold">Subject Marks</h3>
+                      <label className="flex items-center space-x-2 bg-red-500/10 px-3 py-1.5 rounded-lg border border-red-500/20 cursor-pointer hover:bg-red-500/20 transition-all">
+                        <input
+                          type="checkbox"
+                          className="rounded border-red-500 text-red-500 focus:ring-red-500 w-4 h-4 cursor-pointer"
+                          checked={isAbsent}
+                          onChange={(e) => setIsAbsent(e.target.checked)}
+                        />
+                        <span className="text-sm font-medium text-red-500">I was absent for this exam</span>
+                      </label>
+                    </div>
+
+                    {!isAbsent && (
+                      displayedSubjects.length === 0 ? (
+                        <p className="text-sm text-muted-foreground">No subjects found for this exam.</p>
+                      ) : (
+                        <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+                          {displayedSubjects.map(subject => (
+                            <div key={subject.id} className="space-y-2 bg-background/50 p-3 rounded-lg border border-border/30">
+                              <label className="text-sm font-medium text-foreground/80">{subject.name}</label>
+                              <Input
+                                type="number"
+                                placeholder="0"
+                                value={formData.marks[subject.id] || ''}
+                                onChange={e => handleMarkChange(subject.id, e.target.value)}
+                              />
+                            </div>
+                          ))}
+                        </div>
+                      )
+                    )}
+                    {isAbsent && (
+                      <div className="p-4 text-center border border-dashed border-red-500/30 bg-red-500/5 rounded-lg">
+                        <p className="text-red-500/80 text-sm">You are marking yourself as Absent. No marks will be recorded.</p>
+                      </div>
+                    )}
+                  </div>
+
+                  <div className="flex justify-between items-center border-t border-border/50 pt-4 mt-6">
+                    <div className="text-sm text-muted-foreground">
+                      Total Obtained: <span className="font-bold text-foreground">{calculateObtained()}</span> / {formData.totalMaxMarks}
+                    </div>
+                    <Button type="submit" disabled={loading} className="bg-primary text-primary-foreground shadow-lg hover:shadow-primary/25 transition-all">
+                      {loading ? 'Submitting...' : 'Submit for Approval'}
+                    </Button>
+                  </div>
+                </>
+              )}
+            </form>
           )}
         </CardContent>
       </Card>

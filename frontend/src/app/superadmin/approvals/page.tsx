@@ -6,10 +6,14 @@ import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/com
 import { Button } from '@/components/ui/button';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import { CheckCircle2, XCircle, Clock, Trash2 } from 'lucide-react';
+import { useToast } from '@/context/ToastContext';
+import { Modal } from '@/components/ui/modal';
 
 export default function ApprovalsPage() {
   const [pendingResults, setPendingResults] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
+  const { toast } = useToast();
+  const [deletingId, setDeletingId] = useState<string | null>(null);
 
   const fetchApprovals = async () => {
     setLoading(true);
@@ -17,7 +21,7 @@ export default function ApprovalsPage() {
       const res = await api.get('/academic/approvals/pending');
       setPendingResults(res.data);
     } catch (error) {
-      alert('Failed to load pending approvals');
+      toast('Failed to load pending approvals', 'error');
     } finally {
       setLoading(false);
     }
@@ -30,21 +34,23 @@ export default function ApprovalsPage() {
   const handleAction = async (resultId: string, status: 'APPROVED' | 'REJECTED') => {
     try {
       await api.post(`/academic/approvals/${resultId}`, { status });
-      alert(`Exam result ${status.toLowerCase()} successfully`);
+      toast(`Exam result ${status.toLowerCase()} successfully`, 'success');
       setPendingResults(prev => prev.filter(r => r.id !== resultId));
     } catch (error) {
-      alert('Failed to update approval status');
+      toast('Failed to update approval status', 'error');
     }
   };
 
-  const handleDelete = async (resultId: string) => {
-    if (!confirm('Are you sure you want to delete this request completely?')) return;
+  const confirmDelete = async () => {
+    if (!deletingId) return;
     try {
-      await api.delete(`/academic/approvals/${resultId}`);
-      alert('Request deleted successfully');
-      setPendingResults(prev => prev.filter(r => r.id !== resultId));
+      await api.delete(`/academic/approvals/${deletingId}`);
+      toast('Request deleted successfully', 'success');
+      setPendingResults(prev => prev.filter(r => r.id !== deletingId));
     } catch (error) {
-      alert('Failed to delete request');
+      toast('Failed to delete request', 'error');
+    } finally {
+      setDeletingId(null);
     }
   };
 
@@ -136,7 +142,7 @@ export default function ApprovalsPage() {
                           size="sm" 
                           variant="ghost" 
                           className="text-red-500 hover:text-red-600 hover:bg-red-500/10 ml-2"
-                          onClick={() => handleDelete(result.id)}
+                          onClick={() => setDeletingId(result.id)}
                           title="Delete Request Entirely"
                         >
                           <Trash2 className="w-4 h-4" />
@@ -150,6 +156,24 @@ export default function ApprovalsPage() {
           </Table>
         </CardContent>
       </Card>
+
+      <Modal
+        isOpen={!!deletingId}
+        onClose={() => setDeletingId(null)}
+        title="Delete Request"
+      >
+        <div className="space-y-4">
+          <p className="text-muted-foreground">
+            Are you sure you want to completely delete this request? This action cannot be undone and will permanently remove the exam and marks from the database.
+          </p>
+          <div className="flex justify-end gap-2">
+            <Button variant="outline" onClick={() => setDeletingId(null)}>Cancel</Button>
+            <Button variant="destructive" className="bg-red-500 hover:bg-red-600 text-white" onClick={confirmDelete}>
+              Delete
+            </Button>
+          </div>
+        </div>
+      </Modal>
     </div>
   );
 }

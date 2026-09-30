@@ -72,15 +72,19 @@ export default function SubjectsPage() {
     setIsModalOpen(true);
   };
 
-  const handleDelete = async (id: string) => {
-    if (!confirm('Are you sure you want to delete this subject? It may affect existing exams.')) return;
+  const [deletingId, setDeletingId] = useState<string | null>(null);
+
+  const confirmDelete = async () => {
+    if (!deletingId) return;
     try {
-      await api.delete(`/academic/subjects/${id}`);
+      await api.delete(`/academic/subjects/${deletingId}`);
       fetchSubjects();
       toast('Subject deleted successfully', 'success');
     } catch (error) {
       console.error('Failed to delete subject', error);
       toast('Failed to delete subject (It might be in use by an exam)', 'error');
+    } finally {
+      setDeletingId(null);
     }
   };
 
@@ -172,7 +176,7 @@ export default function SubjectsPage() {
                         <Button variant="outline" size="sm" onClick={() => handleEdit(sub)}>
                           Edit
                         </Button>
-                        <Button variant="destructive" size="sm" onClick={() => handleDelete(sub.id)}>
+                        <Button variant="destructive" size="sm" onClick={() => setDeletingId(sub.id)}>
                           Delete
                         </Button>
                       </TableCell>
@@ -184,6 +188,22 @@ export default function SubjectsPage() {
           </div>
         </CardContent>
       </Card>
+
+      <Modal
+        isOpen={!!deletingId}
+        onClose={() => setDeletingId(null)}
+        title="Delete Subject"
+      >
+        <div className="space-y-4">
+          <p className="text-muted-foreground">
+            Are you sure you want to delete this subject? It may affect existing exams.
+          </p>
+          <div className="flex justify-end gap-2 mt-6">
+            <Button variant="outline" onClick={() => setDeletingId(null)}>Cancel</Button>
+            <Button variant="destructive" onClick={confirmDelete}>Delete</Button>
+          </div>
+        </div>
+      </Modal>
     </div>
   );
 }

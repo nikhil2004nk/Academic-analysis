@@ -154,6 +154,22 @@ export default function ExamsPage() {
     }
   };
 
+  const [deletingId, setDeletingId] = useState<string | null>(null);
+
+  const confirmDelete = async () => {
+    if (!deletingId) return;
+    try {
+      await api.delete(`/academic/exams/${deletingId}`);
+      fetchData();
+      toast('Exam deleted successfully', 'success');
+    } catch (error) {
+      console.error('Failed to delete exam', error);
+      toast('Failed to delete exam', 'error');
+    } finally {
+      setDeletingId(null);
+    }
+  };
+
   if (loading) return <div className="p-8 text-center text-muted-foreground animate-pulse">Loading...</div>;
 
   return (
@@ -273,18 +289,7 @@ export default function ExamsPage() {
                         <Button variant="outline" size="sm" onClick={() => handleEditClick(exam)}>
                           Edit
                         </Button>
-                        <Button variant="destructive" size="sm" onClick={() => async function() {
-                          if (confirm('Are you sure you want to delete this exam? All associated marks will also be deleted.')) {
-                            try {
-                              await api.delete(`/academic/exams/${exam.id}`);
-                              fetchData();
-                              toast('Exam deleted successfully', 'success');
-                            } catch (error) {
-                              console.error('Failed to delete exam', error);
-                              toast('Failed to delete exam', 'error');
-                            }
-                          }
-                        }()}>
+                        <Button variant="destructive" size="sm" onClick={() => setDeletingId(exam.id)}>
                           Delete
                         </Button>
                       </div>
@@ -297,6 +302,22 @@ export default function ExamsPage() {
           </div>
         </CardContent>
       </Card>
+
+      <Modal
+        isOpen={!!deletingId}
+        onClose={() => setDeletingId(null)}
+        title="Delete Exam"
+      >
+        <div className="space-y-4">
+          <p className="text-muted-foreground">
+            Are you sure you want to delete this exam? All associated marks will also be deleted. This action cannot be undone.
+          </p>
+          <div className="flex justify-end gap-2 mt-6">
+            <Button variant="outline" onClick={() => setDeletingId(null)}>Cancel</Button>
+            <Button variant="destructive" onClick={confirmDelete}>Delete</Button>
+          </div>
+        </div>
+      </Modal>
     </div>
   );
 }
