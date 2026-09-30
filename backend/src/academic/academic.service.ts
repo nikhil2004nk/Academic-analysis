@@ -464,7 +464,7 @@ export class AcademicService {
     // Now save the marks as PENDING
     const savePayload = [{
       examId: examId,
-      status: AttendanceStatus.PRESENT,
+      status: payload.status || AttendanceStatus.PRESENT,
       marks: payload.marks || {},
       totalMaxMarks: payload.totalMaxMarks || null,
       totalObtainedMarks: payload.totalObtainedMarks || null,

@@ -10,6 +10,14 @@ import { useAuth } from '@/context/AuthContext';
 export default function SubmitExamPage() {
   const { user } = useAuth();
   const [subjects, setSubjects] = useState<any[]>([]);
+  const [existingExams, setExistingExams] = useState<any[]>([]);
+  const [takenExamIds, setTakenExamIds] = useState<Set<string>>(new Set());
+  
+  const [activeTab, setActiveTab] = useState<'existing' | 'custom'>('existing');
+  const [selectedExamId, setSelectedExamId] = useState<string>('');
+  
+  const [isAbsent, setIsAbsent] = useState(false);
+  
   const [formData, setFormData] = useState({
     examName: '',
     examDate: new Date().toISOString().split('T')[0],
@@ -20,10 +28,65 @@ export default function SubmitExamPage() {
   const [loading, setLoading] = useState(false);
 
   useEffect(() => {
+    if (!user) return;
+    
+    // Fetch subjects
     api.get('/academic/subjects?activeOnly=true')
       .then(res => setSubjects(res.data))
       .catch(err => alert('Failed to load subjects'));
-  }, []);
+
+    // Fetch existing exams
+    api.get('/academic/exams')
+      .then(res => setExistingExams(res.data))
+      .catch(err => console.error('Failed to load existing exams'));
+      
+    // Fetch user's taken exams (to filter out)
+    api.get(`/academic/students/${user.id}/marks`)
+      .then(res => {
+        const ids = new Set<string>();
+        res.data.forEach((r: any) => {
+          if (r.examId) ids.add(r.examId);
+        });
+        setTakenExamIds(ids);
+      })
+      .catch(err => console.error('Failed to load student marks'));
+  }, [user]);
+
+  // Available exams are those that exist AND the student hasn't taken
+  const availableExams = existingExams.filter(e => !takenExamIds.has(e.id));
+
+  const handleExamSelect = (examId: string) => {
+    setSelectedExamId(examId);
+    if (examId) {
+      const exam = existingExams.find(e => e.id === examId);
+      if (exam) {
+        const maxMarks = exam.examSubjects?.reduce((acc: number, curr: any) => acc + curr.maxMarks, 0) || 300;
+        setFormData(prev => ({
+          ...prev,
+          examName: exam.name,
+          examDate: exam.date.split('T')[0],
+          examType: exam.type,
+          totalMaxMarks: maxMarks
+        }));
+      }
+    }
+  };
+
+  const handleTabChange = (tab: 'existing' | 'custom') => {
+    setActiveTab(tab);
+    if (tab === 'custom') {
+      setSelectedExamId('');
+      setFormData(prev => ({
+        ...prev,
+        examName: '',
+        examDate: new Date().toISOString().split('T')[0],
+        examType: 'OTHER',
+        totalMaxMarks: 300
+      }));
+    } else {
+      setSelectedExamId(''); // reset selection
+    }
+  };
 
   const handleMarkChange = (subjectId: string, value: string) => {
     setFormData(prev => ({
@@ -36,6 +99,7 @@ export default function SubmitExamPage() {
   };
 
   const calculateObtained = () => {
+    if (isAbsent) return 0;
     return Object.values(formData.marks).reduce((acc, curr) => acc + curr, 0);
   };
 
@@ -43,14 +107,30 @@ export default function SubmitExamPage() {
     e.preventDefault();
     if (!user) return alert('Not logged in');
     
+    if (activeTab === 'existing' && !selectedExamId) {
+      return alert('Please select an exam first');
+    }
+    
     setLoading(true);
     try {
-      const payload = {
+      const payload: any = {
         ...formData,
+        status: isAbsent ? 'ABSENT' : 'PRESENT',
         totalObtainedMarks: calculateObtained()
       };
+      
+      if (activeTab === 'existing') {
+        payload.examId = selectedExamId;
+      }
+      
       await api.post(`/academic/students/${user.id}/submit-exam`, payload);
       alert('Exam submitted successfully! Waiting for admin approval.');
+      
+      // Update local taken state
+      if (activeTab === 'existing') {
+        setTakenExamIds(prev => new Set([...prev, selectedExamId]));
+      }
+      
       setFormData({
         examName: '',
         examDate: new Date().toISOString().split('T')[0],
@@ -58,6 +138,8 @@ export default function SubmitExamPage() {
         totalMaxMarks: 300,
         marks: {},
       });
+      setSelectedExamId('');
+      setIsAbsent(false);
     } catch (error) {
       alert('Failed to submit exam');
       console.error(error);
@@ -65,6 +147,10 @@ export default function SubmitExamPage() {
       setLoading(false);
     }
   };
+
+  const displayedSubjects = activeTab === 'custom' 
+    ? subjects 
+    : subjects.filter(s => existingExams.find(e => e.id === selectedExamId)?.examSubjects?.some((es: any) => es.subjectId === s.id));
 
   return (
     <div className="p-6 max-w-3xl mx-auto space-y-6">
@@ -74,79 +160,150 @@ export default function SubmitExamPage() {
             Submit Exam Marks
           </CardTitle>
           <CardDescription>
-            Enter your custom or external exam marks. An admin will review and approve them before they appear on your dashboard.
+            Submit your marks for a school exam or log a custom practice test.
           </CardDescription>
         </CardHeader>
         <CardContent>
-          <form onSubmit={handleSubmit} className="space-y-6">
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-              <div className="space-y-2">
-                <label className="text-sm font-medium">Exam Name</label>
-                <Input 
-                  required 
-                  placeholder="e.g. Mock Test 1"
-                  value={formData.examName}
-                  onChange={e => setFormData({...formData, examName: e.target.value})}
-                />
-              </div>
-              <div className="space-y-2">
-                <label className="text-sm font-medium">Date</label>
-                <Input 
-                  type="date" 
-                  required 
-                  value={formData.examDate}
-                  onChange={e => setFormData({...formData, examDate: e.target.value})}
-                />
-              </div>
-              <div className="space-y-2">
-                <label className="text-sm font-medium">Exam Type</label>
-                <select 
-                  className="flex h-11 w-full rounded-lg border border-border/50 bg-input/50 px-3 py-2 text-sm transition-all focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-primary"
-                  value={formData.examType}
-                  onChange={e => setFormData({...formData, examType: e.target.value})}
-                >
-                  <option value="MAINS">JEE Mains</option>
-                  <option value="ADVANCED">JEE Advanced</option>
-                  <option value="OTHER">Other / Custom</option>
-                </select>
-              </div>
-              <div className="space-y-2">
-                <label className="text-sm font-medium">Total Maximum Marks</label>
-                <Input 
-                  type="number" 
-                  required 
-                  min="1"
-                  value={formData.totalMaxMarks}
-                  onChange={e => setFormData({...formData, totalMaxMarks: Number(e.target.value)})}
-                />
-              </div>
-            </div>
+          {/* TABS */}
+          <div className="flex gap-4 mb-6 border-b border-border/50 pb-2">
+            <button 
+              className={`font-semibold pb-2 transition-all ${activeTab === 'existing' ? 'text-primary border-b-2 border-primary' : 'text-muted-foreground hover:text-foreground'}`}
+              onClick={() => handleTabChange('existing')}
+            >
+              Select Existing Exam
+            </button>
+            <button 
+              className={`font-semibold pb-2 transition-all ${activeTab === 'custom' ? 'text-primary border-b-2 border-primary' : 'text-muted-foreground hover:text-foreground'}`}
+              onClick={() => handleTabChange('custom')}
+            >
+              Create Custom Exam
+            </button>
+          </div>
 
-            <div className="border-t border-border/50 pt-4 mt-6">
-              <h3 className="text-lg font-semibold mb-4">Subject Marks</h3>
-              <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-                {subjects.map(subject => (
-                  <div key={subject.id} className="space-y-2 bg-background/50 p-3 rounded-lg border border-border/30">
-                    <label className="text-sm font-medium text-foreground/80">{subject.name}</label>
+          <form onSubmit={handleSubmit} className="space-y-6">
+            
+            {activeTab === 'existing' && (
+              <div className="space-y-2 mb-6">
+                <label className="text-sm font-medium">Select Official Exam</label>
+                {availableExams.length === 0 ? (
+                  <div className="p-4 bg-primary/10 text-primary rounded-lg text-sm font-medium">
+                    You have already submitted marks for all available exams! 🎉
+                  </div>
+                ) : (
+                  <select 
+                    className="flex h-11 w-full rounded-lg border border-border/50 bg-input/50 px-3 py-2 text-sm transition-all focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-primary"
+                    value={selectedExamId}
+                    onChange={e => handleExamSelect(e.target.value)}
+                    required
+                  >
+                    <option value="" disabled>-- Select Exam --</option>
+                    {availableExams.map(exam => (
+                      <option key={exam.id} value={exam.id}>{exam.name} ({new Date(exam.date).toLocaleDateString()})</option>
+                    ))}
+                  </select>
+                )}
+              </div>
+            )}
+
+            {(activeTab === 'custom' || (activeTab === 'existing' && selectedExamId)) && (
+              <>
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-4 opacity-70">
+                  <div className="space-y-2">
+                    <label className="text-sm font-medium">Exam Name</label>
                     <Input 
-                      type="number" 
-                      placeholder="0"
-                      value={formData.marks[subject.id] || ''}
-                      onChange={e => handleMarkChange(subject.id, e.target.value)}
+                      required 
+                      disabled={activeTab === 'existing'}
+                      placeholder="e.g. Mock Test 1"
+                      value={formData.examName}
+                      onChange={e => setFormData({...formData, examName: e.target.value})}
                     />
                   </div>
-                ))}
-              </div>
-            </div>
+                  <div className="space-y-2">
+                    <label className="text-sm font-medium">Date</label>
+                    <Input 
+                      type="date" 
+                      required 
+                      disabled={activeTab === 'existing'}
+                      value={formData.examDate}
+                      onChange={e => setFormData({...formData, examDate: e.target.value})}
+                    />
+                  </div>
+                  <div className="space-y-2">
+                    <label className="text-sm font-medium">Exam Type</label>
+                    <select 
+                      className="flex h-11 w-full rounded-lg border border-border/50 bg-input/50 px-3 py-2 text-sm transition-all focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-primary disabled:opacity-50"
+                      disabled={activeTab === 'existing'}
+                      value={formData.examType}
+                      onChange={e => setFormData({...formData, examType: e.target.value})}
+                    >
+                      <option value="MAINS">JEE Mains</option>
+                      <option value="ADVANCED">JEE Advanced</option>
+                      <option value="OTHER">Other / Custom</option>
+                    </select>
+                  </div>
+                  <div className="space-y-2">
+                    <label className="text-sm font-medium">Total Maximum Marks</label>
+                    <Input 
+                      type="number" 
+                      required 
+                      min="1"
+                      disabled={activeTab === 'existing'}
+                      value={formData.totalMaxMarks}
+                      onChange={e => setFormData({...formData, totalMaxMarks: Number(e.target.value)})}
+                    />
+                  </div>
+                </div>
 
-            <div className="flex justify-between items-center border-t border-border/50 pt-4 mt-6">
-              <div className="text-sm text-muted-foreground">
-                Total Obtained: <span className="font-bold text-foreground">{calculateObtained()}</span> / {formData.totalMaxMarks}
-              </div>
-              <Button type="submit" disabled={loading} className="bg-primary text-primary-foreground shadow-lg hover:shadow-primary/25 transition-all">
-                {loading ? 'Submitting...' : 'Submit for Approval'}
-              </Button>
-            </div>
+                <div className="border-t border-border/50 pt-4 mt-6">
+                  <div className="flex items-center justify-between mb-4">
+                    <h3 className="text-lg font-semibold">Subject Marks</h3>
+                    <label className="flex items-center space-x-2 bg-red-500/10 px-3 py-1.5 rounded-lg border border-red-500/20 cursor-pointer hover:bg-red-500/20 transition-all">
+                      <input 
+                        type="checkbox" 
+                        className="rounded border-red-500 text-red-500 focus:ring-red-500 w-4 h-4 cursor-pointer"
+                        checked={isAbsent}
+                        onChange={(e) => setIsAbsent(e.target.checked)}
+                      />
+                      <span className="text-sm font-medium text-red-500">I was absent for this exam</span>
+                    </label>
+                  </div>
+
+                  {!isAbsent && (
+                    displayedSubjects.length === 0 ? (
+                      <p className="text-sm text-muted-foreground">No subjects found for this exam.</p>
+                    ) : (
+                      <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+                        {displayedSubjects.map(subject => (
+                          <div key={subject.id} className="space-y-2 bg-background/50 p-3 rounded-lg border border-border/30">
+                            <label className="text-sm font-medium text-foreground/80">{subject.name}</label>
+                            <Input 
+                              type="number" 
+                              placeholder="0"
+                              value={formData.marks[subject.id] || ''}
+                              onChange={e => handleMarkChange(subject.id, e.target.value)}
+                            />
+                          </div>
+                        ))}
+                      </div>
+                    )
+                  )}
+                  {isAbsent && (
+                    <div className="p-4 text-center border border-dashed border-red-500/30 bg-red-500/5 rounded-lg">
+                      <p className="text-red-500/80 text-sm">You are marking yourself as Absent. No marks will be recorded.</p>
+                    </div>
+                  )}
+                </div>
+
+                <div className="flex justify-between items-center border-t border-border/50 pt-4 mt-6">
+                  <div className="text-sm text-muted-foreground">
+                    Total Obtained: <span className="font-bold text-foreground">{calculateObtained()}</span> / {formData.totalMaxMarks}
+                  </div>
+                  <Button type="submit" disabled={loading} className="bg-primary text-primary-foreground shadow-lg hover:shadow-primary/25 transition-all">
+                    {loading ? 'Submitting...' : 'Submit for Approval'}
+                  </Button>
+                </div>
+              </>
+            )}
           </form>
         </CardContent>
       </Card>
