@@ -181,7 +181,7 @@ export default function SubmitExamPage() {
     : subjects.filter(s => existingExams.find(e => e.id === selectedExamId)?.examSubjects?.some((es: any) => es.subjectId === s.id));
 
   return (
-    <div className="p-6 max-w-3xl mx-auto space-y-6">
+    <div className="p-4 md:p-6 max-w-5xl mx-auto space-y-6">
       <Card className="border-border/50 bg-card/50 backdrop-blur-sm shadow-xl">
         <CardHeader>
           <CardTitle className="text-2xl font-bold bg-gradient-to-r from-primary to-primary/60 bg-clip-text text-transparent">
@@ -224,8 +224,8 @@ export default function SubmitExamPage() {
                   You haven't submitted any exams yet.
                 </div>
               ) : (
-                <div className="rounded-xl border border-border/50 overflow-hidden">
-                  <table className="w-full text-sm text-left">
+                <div className="rounded-xl border border-border/50 overflow-x-auto">
+                  <table className="w-full text-sm text-left whitespace-nowrap">
                     <thead className="bg-muted/50 text-muted-foreground border-b border-border/50">
                       <tr>
                         <th className="px-4 py-3 font-medium">Exam Name</th>
