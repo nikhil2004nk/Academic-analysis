@@ -7,6 +7,7 @@ import { Input } from '@/components/ui/input';
 import { Button } from '@/components/ui/button';
 import { useAuth } from '@/context/AuthContext';
 import { Select } from '@/components/ui/select';
+import { DatePicker } from '@/components/ui/date-picker';
 
 export default function SubmitExamPage() {
   const { user } = useAuth();
@@ -14,7 +15,7 @@ export default function SubmitExamPage() {
   const [existingExams, setExistingExams] = useState<any[]>([]);
   const [takenExamIds, setTakenExamIds] = useState<Set<string>>(new Set());
   
-  const [activeTab, setActiveTab] = useState<'existing' | 'custom'>('existing');
+  const [activeTab, setActiveTab] = useState<'existing' | 'custom' | 'submissions'>('existing');
   const [selectedExamId, setSelectedExamId] = useState<string>('');
   
   const [isAbsent, setIsAbsent] = useState(false);
@@ -27,6 +28,7 @@ export default function SubmitExamPage() {
     marks: {} as Record<string, number>,
   });
   const [loading, setLoading] = useState(false);
+  const [submissions, setSubmissions] = useState<any[]>([]);
 
   useEffect(() => {
     if (!user) return;
@@ -42,15 +44,16 @@ export default function SubmitExamPage() {
       .catch(err => console.error('Failed to load existing exams'));
       
     // Fetch user's taken exams (to filter out)
-    api.get(`/academic/students/${user.id}/marks`)
+    api.get(`/academic/students/${user.id}/submissions`)
       .then(res => {
+        setSubmissions(res.data);
         const ids = new Set<string>();
         res.data.forEach((r: any) => {
-          if (r.examId) ids.add(r.examId);
+          if (r.examId && r.approvalStatus !== 'REJECTED') ids.add(r.examId);
         });
         setTakenExamIds(ids);
       })
-      .catch(err => console.error('Failed to load student marks'));
+      .catch(err => console.error('Failed to load student submissions'));
   }, [user]);
 
   // Available exams are those that exist AND the student hasn't taken
@@ -73,7 +76,7 @@ export default function SubmitExamPage() {
     }
   };
 
-  const handleTabChange = (tab: 'existing' | 'custom') => {
+  const handleTabChange = (tab: 'existing' | 'custom' | 'submissions') => {
     setActiveTab(tab);
     if (tab === 'custom') {
       setSelectedExamId('');
@@ -84,9 +87,33 @@ export default function SubmitExamPage() {
         examType: 'OTHER',
         totalMaxMarks: 300
       }));
-    } else {
+    } else if (tab === 'existing') {
       setSelectedExamId(''); // reset selection
+    } else if (tab === 'submissions') {
+      // Refresh submissions
+      api.get(`/academic/students/${user?.id}/submissions`).then(res => setSubmissions(res.data));
     }
+  };
+
+  const handleResubmit = (sub: any) => {
+    // Fill form with the previous data
+    const isCustom = sub.exam?.approvalStatus === 'REJECTED' || sub.exam?.approvalStatus === 'PENDING';
+    setActiveTab(isCustom ? 'custom' : 'existing');
+    
+    if (!isCustom) {
+      setSelectedExamId(sub.examId);
+    } else {
+      setSelectedExamId('');
+    }
+    
+    setIsAbsent(sub.status === 'ABSENT');
+    setFormData({
+      examName: sub.exam?.name || '',
+      examDate: sub.exam?.date ? sub.exam.date.split('T')[0] : new Date().toISOString().split('T')[0],
+      examType: sub.exam?.type || 'OTHER',
+      totalMaxMarks: sub.totalMaxMarks || 300,
+      marks: sub.marks || {},
+    });
   };
 
   const handleMarkChange = (subjectId: string, value: string) => {
@@ -166,24 +193,94 @@ export default function SubmitExamPage() {
         </CardHeader>
         <CardContent>
           {/* TABS */}
-          <div className="flex gap-4 mb-6 border-b border-border/50 pb-2">
+          <div className="flex gap-4 mb-6 border-b border-border/50 pb-2 overflow-x-auto">
             <button 
               type="button"
-              className={`font-semibold pb-2 transition-all ${activeTab === 'existing' ? 'text-primary border-b-2 border-primary' : 'text-muted-foreground hover:text-foreground'}`}
+              className={`font-semibold pb-2 transition-all whitespace-nowrap ${activeTab === 'existing' ? 'text-primary border-b-2 border-primary' : 'text-muted-foreground hover:text-foreground'}`}
               onClick={() => handleTabChange('existing')}
             >
               Select Existing Exam
             </button>
             <button 
               type="button"
-              className={`font-semibold pb-2 transition-all ${activeTab === 'custom' ? 'text-primary border-b-2 border-primary' : 'text-muted-foreground hover:text-foreground'}`}
+              className={`font-semibold pb-2 transition-all whitespace-nowrap ${activeTab === 'custom' ? 'text-primary border-b-2 border-primary' : 'text-muted-foreground hover:text-foreground'}`}
               onClick={() => handleTabChange('custom')}
             >
               Create Custom Exam
             </button>
+            <button 
+              type="button"
+              className={`font-semibold pb-2 transition-all whitespace-nowrap ${activeTab === 'submissions' ? 'text-primary border-b-2 border-primary' : 'text-muted-foreground hover:text-foreground'}`}
+              onClick={() => handleTabChange('submissions')}
+            >
+              My Submissions
+            </button>
           </div>
 
-          <form onSubmit={handleSubmit} className="space-y-6">
+          {activeTab === 'submissions' ? (
+            <div className="space-y-4">
+              {submissions.length === 0 ? (
+                <div className="p-8 text-center text-muted-foreground bg-muted/20 rounded-xl border border-border/50">
+                  You haven't submitted any exams yet.
+                </div>
+              ) : (
+                <div className="rounded-xl border border-border/50 overflow-hidden">
+                  <table className="w-full text-sm text-left">
+                    <thead className="bg-muted/50 text-muted-foreground border-b border-border/50">
+                      <tr>
+                        <th className="px-4 py-3 font-medium">Exam Name</th>
+                        <th className="px-4 py-3 font-medium">Date</th>
+                        <th className="px-4 py-3 font-medium">Score</th>
+                        <th className="px-4 py-3 font-medium">Status</th>
+                        <th className="px-4 py-3 font-medium text-right">Actions</th>
+                      </tr>
+                    </thead>
+                    <tbody className="divide-y divide-border/50">
+                      {submissions.map((sub: any) => (
+                        <tr key={sub.id} className="bg-card hover:bg-muted/20 transition-colors">
+                          <td className="px-4 py-3 font-medium">
+                            {sub.exam ? sub.exam.name : 'Unknown Exam'}
+                          </td>
+                          <td className="px-4 py-3 text-muted-foreground">
+                            {sub.exam ? new Date(sub.exam.date).toLocaleDateString() : '-'}
+                          </td>
+                          <td className="px-4 py-3">
+                            {sub.status === 'ABSENT' ? (
+                              <span className="text-red-500 font-medium text-xs">ABSENT</span>
+                            ) : (
+                              <span className="font-semibold">{sub.totalMarksObtained} <span className="text-muted-foreground font-normal">/ {sub.totalMaxMarks}</span></span>
+                            )}
+                          </td>
+                          <td className="px-4 py-3">
+                            <span className={`inline-flex items-center px-2 py-1 rounded-full text-xs font-semibold
+                              ${sub.approvalStatus === 'APPROVED' ? 'bg-green-500/10 text-green-500' : 
+                                sub.approvalStatus === 'REJECTED' ? 'bg-red-500/10 text-red-500' : 
+                                'bg-yellow-500/10 text-yellow-600 dark:text-yellow-400'}`}
+                            >
+                              {sub.approvalStatus}
+                            </span>
+                          </td>
+                          <td className="px-4 py-3 text-right">
+                            {sub.approvalStatus === 'REJECTED' && (
+                              <Button 
+                                size="sm" 
+                                variant="outline" 
+                                className="text-xs h-8"
+                                onClick={() => handleResubmit(sub)}
+                              >
+                                Edit & Resubmit
+                              </Button>
+                            )}
+                          </td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                </div>
+              )}
+            </div>
+          ) : (
+            <form onSubmit={handleSubmit} className="space-y-6">
             
             {activeTab === 'existing' && (
               <div className="space-y-2 mb-6">
@@ -221,13 +318,13 @@ export default function SubmitExamPage() {
                   </div>
                   <div className="space-y-2">
                     <label className="text-sm font-medium">Date</label>
-                    <Input 
-                      type="date" 
-                      required 
-                      disabled={activeTab === 'existing'}
-                      value={formData.examDate}
-                      onChange={e => setFormData({...formData, examDate: e.target.value})}
-                    />
+                    <div className={activeTab === 'existing' ? 'opacity-50 pointer-events-none' : ''}>
+                      <DatePicker 
+                        required 
+                        value={formData.examDate}
+                        onChange={(value: string) => setFormData({...formData, examDate: value})}
+                      />
+                    </div>
                   </div>
                   <div className="space-y-2">
                     <label className="text-sm font-medium">Exam Type</label>
@@ -307,6 +404,7 @@ export default function SubmitExamPage() {
               </>
             )}
           </form>
+          )}
         </CardContent>
       </Card>
     </div>

@@ -93,6 +93,15 @@ export class AcademicController {
     return this.academicService.getMarksByStudent(studentId);
   }
 
+  @Get('students/:id/submissions')
+  @Roles(Role.STUDENT)
+  getStudentSubmissions(@Param('id') studentId: string, @Request() req: any) {
+    if (req.user.role === Role.STUDENT && req.user.id !== studentId) {
+      studentId = req.user.id;
+    }
+    return this.academicService.getStudentSubmissions(studentId);
+  }
+
   @Post('students/:id/marks')
   @Roles(Role.SUPERADMIN)
   saveMarksByStudent(@Param('id') studentId: string, @Body() marksData: any[]) {
@@ -139,5 +148,11 @@ export class AcademicController {
       studentId = req.user.id; // Override if they try to look at another's
     }
     return this.academicService.getStudentDashboard(studentId, startDate, endDate);
+  }
+
+  @Delete('approvals/:id')
+  @Roles(Role.SUPERADMIN)
+  deleteResult(@Param('id') id: string) {
+    return this.academicService.deleteResult(id);
   }
 }

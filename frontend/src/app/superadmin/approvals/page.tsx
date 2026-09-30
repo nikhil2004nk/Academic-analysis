@@ -5,7 +5,7 @@ import api from '@/lib/api';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
-import { CheckCircle2, XCircle, Clock } from 'lucide-react';
+import { CheckCircle2, XCircle, Clock, Trash2 } from 'lucide-react';
 
 export default function ApprovalsPage() {
   const [pendingResults, setPendingResults] = useState<any[]>([]);
@@ -34,6 +34,17 @@ export default function ApprovalsPage() {
       setPendingResults(prev => prev.filter(r => r.id !== resultId));
     } catch (error) {
       alert('Failed to update approval status');
+    }
+  };
+
+  const handleDelete = async (resultId: string) => {
+    if (!confirm('Are you sure you want to delete this request completely?')) return;
+    try {
+      await api.delete(`/academic/approvals/${resultId}`);
+      alert('Request deleted successfully');
+      setPendingResults(prev => prev.filter(r => r.id !== resultId));
+    } catch (error) {
+      alert('Failed to delete request');
     }
   };
 
@@ -120,6 +131,15 @@ export default function ApprovalsPage() {
                           onClick={() => handleAction(result.id, 'APPROVED')}
                         >
                           <CheckCircle2 className="w-4 h-4 mr-1" /> Approve
+                        </Button>
+                        <Button 
+                          size="sm" 
+                          variant="ghost" 
+                          className="text-red-500 hover:text-red-600 hover:bg-red-500/10 ml-2"
+                          onClick={() => handleDelete(result.id)}
+                          title="Delete Request Entirely"
+                        >
+                          <Trash2 className="w-4 h-4" />
                         </Button>
                       </div>
                     </TableCell>

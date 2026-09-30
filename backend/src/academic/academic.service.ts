@@ -116,6 +116,7 @@ export class AcademicService {
 
   async findAllExams() {
     return this.examRepository.find({
+      where: { approvalStatus: 'APPROVED' as any },
       relations: {
         examSubjects: {
           subject: true,
@@ -251,6 +252,14 @@ export class AcademicService {
         totalMaxMarks: r.totalMaxMarks,
         totalObtainedMarks: r.totalMarksObtained,
       };
+    });
+  }
+
+  async getStudentSubmissions(studentId: string) {
+    return this.examResultRepository.find({
+      where: { studentId },
+      relations: { exam: true },
+      order: { createdAt: 'DESC' },
     });
   }
 
@@ -434,11 +443,38 @@ export class AcademicService {
     });
   }
 
+  async deleteResult(resultId: string) {
+    const result = await this.examResultRepository.findOne({ where: { id: resultId } });
+    if (!result) throw new NotFoundException('Exam result not found');
+    
+    await this.examResultRepository.delete(resultId);
+    
+    // Also delete the parent exam if it was a custom exam to clean it up
+    if (result.examId) {
+      const exam = await this.examRepository.findOne({ where: { id: result.examId } });
+      if (exam && (exam.approvalStatus as any) !== 'APPROVED') {
+        await this.examRepository.delete(exam.id);
+      }
+    }
+    return { success: true };
+  }
+
   async approveOrRejectResult(resultId: string, status: 'APPROVED' | 'REJECTED') {
     const result = await this.examResultRepository.findOne({ where: { id: resultId } });
     if (!result) throw new NotFoundException('Exam result not found');
     result.approvalStatus = status as any;
-    return this.examResultRepository.save(result);
+    const savedResult = await this.examResultRepository.save(result);
+
+    // If there is an associated exam, update its status too (in case it was a custom student exam)
+    if (result.examId) {
+      const exam = await this.examRepository.findOne({ where: { id: result.examId } });
+      if (exam && exam.approvalStatus === 'PENDING') {
+        exam.approvalStatus = status as any;
+        await this.examRepository.save(exam);
+      }
+    }
+
+    return savedResult;
   }
 
   async submitStudentExam(studentId: string, payload: any) {
@@ -451,6 +487,7 @@ export class AcademicService {
       exam.name = payload.examName || 'Custom Student Exam';
       exam.date = new Date(payload.examDate || new Date());
       exam.type = payload.examType || 'OTHER';
+      exam.approvalStatus = 'PENDING' as any;
       exam.examSubjects = [];
 
       // Add subjects
