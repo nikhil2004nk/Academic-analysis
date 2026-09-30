@@ -273,25 +273,24 @@ function StudentDashboard({ userId, headerContent }: { userId: string, headerCon
 
   lineChartData.sort((a, b) => a._dateRaw - b._dateRaw);
 
-  // Custom Tooltips
   const CustomLineTooltip = ({ active, payload, label }: any) => {
     if (active && payload && payload.length) {
       const details = payload[0].payload._details;
       return (
-        <div className="bg-black/95 border border-white/20 p-3 rounded-md shadow-xl min-w-[200px]">
-          <p className="font-bold text-white mb-1">{label}</p>
-          {details?.examName && <p className="text-xs text-muted-foreground mb-3">{details.examName}</p>}
-          <div className="space-y-1.5">
+        <div className="bg-black/95 border border-white/20 p-2 sm:p-3 rounded-md shadow-xl min-w-[150px] sm:min-w-[200px] pointer-events-none max-w-[250px] sm:max-w-none">
+          <p className="font-bold text-white mb-1 text-xs sm:text-sm">{label}</p>
+          {details?.examName && <p className="text-[10px] sm:text-xs text-muted-foreground mb-2 sm:mb-3 truncate">{details.examName}</p>}
+          <div className="space-y-1 sm:space-y-1.5">
             {payload.map((entry: any, index: number) => (
-              <div key={index} className="flex justify-between items-center text-sm">
-                <div className="flex items-center gap-2">
-                  <div className="w-2 h-2 rounded-full" style={{ backgroundColor: entry.color }} />
-                  <span style={{ color: entry.color }} className="font-medium">{entry.name}</span>
+              <div key={index} className="flex justify-between items-center text-xs sm:text-sm">
+                <div className="flex items-center gap-1.5 sm:gap-2 overflow-hidden">
+                  <div className="w-1.5 h-1.5 sm:w-2 sm:h-2 rounded-full shrink-0" style={{ backgroundColor: entry.color }} />
+                  <span style={{ color: entry.color }} className="font-medium truncate max-w-[80px] sm:max-w-none">{entry.name}</span>
                 </div>
-                <div className="text-right pl-4">
+                <div className="text-right pl-2 sm:pl-4 shrink-0">
                   <span className="text-white font-bold">{entry.value}%</span>
                   {details && details[entry.dataKey] && (
-                    <span className="text-xs text-muted-foreground ml-2">({details[entry.dataKey]})</span>
+                    <span className="text-[10px] sm:text-xs text-muted-foreground ml-1 sm:ml-2">({details[entry.dataKey]})</span>
                   )}
                 </div>
               </div>
@@ -546,7 +545,7 @@ function StudentDashboard({ userId, headerContent }: { userId: string, headerCon
                   <CartesianGrid strokeDasharray="3 3" stroke="rgba(255,255,255,0.1)" vertical={false} />
                   <XAxis dataKey="name" stroke="rgba(255,255,255,0.5)" tick={{ fill: 'rgba(255,255,255,0.7)', fontSize: 12 }} />
                   <YAxis stroke="rgba(255,255,255,0.5)" tick={{ fill: 'rgba(255,255,255,0.7)', fontSize: 12 }} domain={[0, 100]} />
-                  <RechartsTooltip content={<CustomTypeTooltip />} cursor={{ fill: 'rgba(255,255,255,0.05)' }} />
+                  <RechartsTooltip content={<CustomTypeTooltip />} cursor={{ fill: 'rgba(255,255,255,0.05)' }} wrapperStyle={{ zIndex: 100, pointerEvents: 'none' }} />
                   <Bar
                     dataKey="percentage"
                     radius={[4, 4, 0, 0]}
@@ -578,7 +577,7 @@ function StudentDashboard({ userId, headerContent }: { userId: string, headerCon
                   <CartesianGrid strokeDasharray="3 3" stroke="rgba(255,255,255,0.1)" vertical={false} />
                   <XAxis dataKey="name" stroke="rgba(255,255,255,0.5)" tick={{ fill: 'rgba(255,255,255,0.7)', fontSize: 12 }} />
                   <YAxis stroke="rgba(255,255,255,0.5)" tick={{ fill: 'rgba(255,255,255,0.7)', fontSize: 12 }} domain={[0, 100]} />
-                  <RechartsTooltip content={<CustomBarTooltip />} cursor={{ fill: 'rgba(255,255,255,0.05)' }} />
+                  <RechartsTooltip content={<CustomBarTooltip />} cursor={{ fill: 'rgba(255,255,255,0.05)' }} wrapperStyle={{ zIndex: 100, pointerEvents: 'none' }} />
                   <Bar
                     dataKey="percentage"
                     name="Average %"
@@ -621,15 +620,19 @@ function StudentDashboard({ userId, headerContent }: { userId: string, headerCon
               <CartesianGrid strokeDasharray="3 3" stroke="rgba(255,255,255,0.1)" />
               <XAxis 
                 dataKey="name" 
-                stroke="rgba(255,255,255,0.5)" 
-                tick={{ fill: 'rgba(255,255,255,0.7)', fontSize: 11 }} 
+                stroke="rgba(255,255,255,0.5)"
+                tick={{ fill: 'rgba(255,255,255,0.7)', fontSize: 11 }}
                 angle={-45}
                 textAnchor="end"
                 height={60}
                 minTickGap={5}
               />
               <YAxis stroke="rgba(255,255,255,0.5)" domain={[0, 100]} tick={{ fill: 'rgba(255,255,255,0.7)', fontSize: 12 }} />
-              <RechartsTooltip content={<CustomLineTooltip />} />
+              <RechartsTooltip 
+                content={<CustomLineTooltip />} 
+                wrapperStyle={{ zIndex: 100, pointerEvents: 'none' }}
+                isAnimationActive={false}
+              />
               <Legend wrapperStyle={{ paddingTop: '20px' }} />
               <Line type="monotone" dataKey="overall" stroke="#ffffff" strokeWidth={3} name="Overall Percentage" dot={{ r: 4, fill: '#fff' }} />
               {allSubjects.map(sub => (
