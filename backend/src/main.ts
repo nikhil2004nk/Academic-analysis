@@ -9,7 +9,16 @@ async function bootstrap() {
   app.use(cookieParser());
 
   app.enableCors({
-    origin: ['http://localhost:5001', 'https://aaayushk.vercel.app'],
+    origin: (origin, callback) => {
+      // Allow any local network IP for mobile testing, or specific production domains
+      if (!origin || /^http:\/\/(localhost|127\.0\.0\.1|192\.168\.\d+\.\d+|10\.\d+\.\d+|172\.(1[6-9]|2\d|3[0-1])\.\d+\.\d+)(:\d+)?$/.test(origin) || origin === 'https://aaayushk.vercel.app') {
+        callback(null, true);
+      } else {
+        // If you want to strictly block unknown origins in production:
+        // callback(new Error('Not allowed by CORS'));
+        callback(null, true); // Currently allowing all for testing purposes
+      }
+    },
     credentials: true,
   });
 
